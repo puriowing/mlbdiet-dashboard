@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dodgers Diet Dashboard – Web版（Google Sheets連携）</title>
+<title>Dodgers Diet Dashboard – Web版（Google Sheets連携・FIX）</title>
 <style>
   :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--ink:#111827;}
   body{font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif; margin: 24px; line-height:1.55; color:var(--ink);}
@@ -17,22 +17,17 @@
   th,td{padding:8px; border-bottom:1px solid var(--border); text-align:left}
   th{background:var(--bg); font-weight:600}
   .small{font-size:12px}
-  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:12px}
-  .ok{color:#065f46}
-  .warn{color:#92400e}
 </style>
 </head>
 <body>
-  <h1>ドジャース減量シーズン・ダッシュボード（Web版）</h1>
-  <div class="muted small">このページは公開Googleスプレッドシートのデータを読み込み、常に最新に更新します。</div>
+  <h1>ドジャース減量シーズン・ダッシュボード（Web版/FIX）</h1>
+  <div class="muted small">Googleスプレッドシートのデータを自動取得して表示します。数値が出ない場合は、SHEET_ID・公開設定・シート名(games)・ヘッダーを確認してください。</div>
 
   <div class="grid">
     <div class="card">
       <h2>設定</h2>
-      <div class="small">下の <code>SHEET_ID</code> をあなたのスプレッドシートIDに置き換えて公開してください。</div>
-      <div class="small">シート名は <strong>games</strong> を想定。列は下記のCSVヘッダーと揃えてください。</div>
+      <div class="small">このHTMLの <code>SHEET_ID</code> をあなたのシートIDに置き換えてください。シート名は <strong>games</strong>。</div>
       <pre class="small">date,opponent,dodgers_runs,opp_runs,result,AB,H,HR,RBI,R,BB,TB,comment,kcal_total,carb_total,prot_total,fat_total</pre>
-      <div class="small">※ TB（塁打）は 1B+2×2B+3×3B+4×HR。わからない場合は空でも可（自動で H と HR から推計: TB≈H+3×HR）。</div>
     </div>
 
     <div class="card">
@@ -65,7 +60,6 @@
           <tr><th>脂質</th><td id="FAT">-</td></tr>
         </tbody>
       </table>
-      <div class="small muted">※ 日次合計は各日の行の合計値（複数行で同日を入れる場合は日単位で集計するよう拡張してください）。</div>
     </div>
   </div>
 
@@ -76,7 +70,7 @@
         <thead><tr><th>順位</th><th>チーム</th><th>勝</th><th>敗</th><th>勝率</th><th>GB</th></tr></thead>
         <tbody></tbody>
       </table>
-      <div class="small muted">※ ドジャースと相手は自動集計。他3球団の勝敗は別シートで管理するか、この表の下の手動設定で補完してください。</div>
+      <div class="small muted">※ ドジャースと対戦相手は自動集計。他3球団は別途補完してください。</div>
     </div>
 
     <div class="card">
@@ -91,52 +85,39 @@
   </div>
 
 <script>
-// ====== 設定 ======
-const SHEET_ID = "1b3oO6nDY1d-jmP2cFchm7ld5PvKIr34vh0KXYYKxx8I"; // ←あなたのスプレッドシートID
+const SHEET_ID = "1b3oO6nDY1d-jmP2cFchm7ld5PvKIr34vh0KXYYKxx8I";
 const SHEET_NAME = "games";
-const REFRESH_SEC = 60;
+const REFRESH_SEC = 10;
 
-// ====== 取得URL（GViz JSON） ======
 function gvizUrl(){
   return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
 }
 
-// ====== GViz JSON のパース ======
 async function fetchSheet(){
   const res = await fetch(gvizUrl());
   const txt = await res.text();
-  const m = txt.match(/setResponse\\(([\\s\\S]*)\\)/);
-  if(!m){ throw new Error("GViz応答の形式が想定外です。公開設定とSHEET_IDを確認してください。"); }
+  const m = txt.match(/setResponse\(([\s\S]*)\)/);
+  if(!m){ throw new Error("GViz応答の形式が想定外です。"); }
   const json = JSON.parse(m[1]);
   const cols = json.table.cols.map(c=>c.label || c.id);
   const rows = json.table.rows.map(r=>{
     const obj = {};
     cols.forEach((c, i)=>{
       const cell = r.c[i];
-      obj[c] = cell ? (cell.v!==undefined? cell.v : cell.f) : null;
+      obj[c] = cell ? ( (cell.f ?? cell.v) ) : null;
     });
     return obj;
   });
   return {cols, rows};
 }
 
-// ====== Standings 計算（NL West） ======
-const TEAMS = ["ドジャース","ジャイアンツ","パドレス","Dバックス","ロッキーズ"];
 function pct(w,l){ const g=w+l; return g===0? ".000" : (Math.round((w/g)*1000)/1000).toFixed(3).padStart(5,'0'); }
 function gb(leaderW, leaderL, w, l){ const v=((leaderW-w)+(l-leaderL))/2; return v===0? "-" : v.toFixed(1); }
 
 function computeFromRows(rows){
   let G=0, AB=0, H=0, HR=0, RBI=0, R=0, BB=0, TB=0;
   let lastK=0, lastC=0, lastP=0, lastF=0;
-
-  const standings = {
-    "ドジャース": {w:0,l:0},
-    "ジャイアンツ": {w:0,l:0},
-    "パドレス": {w:0,l:0},
-    "Dバックス": {w:0,l:0},
-    "ロッキーズ": {w:0,l:0}
-  };
-
+  const standings = {"ドジャース":{w:0,l:0},"ジャイアンツ":{w:0,l:0},"パドレス":{w:0,l:0},"Dバックス":{w:0,l:0},"ロッキーズ":{w:0,l:0}};
   const logRows = [];
 
   rows.forEach(r=>{
@@ -145,7 +126,6 @@ function computeFromRows(rows){
     const ds   = Number(r.dodgers_runs || r.Dodgers || r.ds || 0);
     const os   = Number(r.opp_runs || r.Opp || r.os || 0);
     const res  = r.result || (ds>os?"W":(ds<os?"L":"T"));
-
     const ab = Number(r.AB||r.ab||0);
     const h  = Number(r.H||r.h||0);
     const hr = Number(r.HR||r.hr||0);
@@ -174,13 +154,13 @@ function computeFromRows(rows){
   const OBP = (AB+BB)>0 ? ((H+BB)/(AB+BB)).toFixed(3) : ".000";
   const SLG = AB>0 ? (TB/AB).toFixed(3) : ".000";
   const OPS = (parseFloat(OBP)+parseFloat(SLG)).toFixed(3);
-
   return { totals:{G,AB,H,HR,RBI,R,BB,TB,AVG,OBP,SLG,OPS, lastK,lastC,lastP,lastF}, standings, logRows };
 }
 
 function render(totals, standings, logRows){
-  const ids = ["G","AB","H","HR","RBI","R","BB","TB","AVG","OBP","SLG","OPS"];
-  ids.forEach(id=>document.getElementById(id).textContent = totals[id] ?? "-");
+  ["G","AB","H","HR","RBI","R","BB","TB","AVG","OBP","SLG","OPS"].forEach(id=>{
+    document.getElementById(id).textContent = totals[id] ?? "-";
+  });
   document.getElementById("KCAL").textContent = totals.lastK? `${totals.lastK} kcal` : "-";
   document.getElementById("CARB").textContent = totals.lastC? `${totals.lastC} g` : "-";
   document.getElementById("PROT").textContent = totals.lastP? `${totals.lastP} g` : "-";
@@ -214,9 +194,14 @@ function render(totals, standings, logRows){
 }
 
 async function refresh(){
-  const {rows} = await fetchSheet();
-  const {totals, standings, logRows} = computeFromRows(rows);
-  render(totals, standings, logRows);
+  try{
+    const {rows} = await fetchSheet();
+    const {totals, standings, logRows} = computeFromRows(rows);
+    render(totals, standings, logRows);
+  }catch(e){
+    console.error("Sheet fetch/render error:", e);
+    alert("シートの読み込みに失敗：公開設定 / SHEET_ID / シート名(games) をご確認ください。");
+  }
 }
 
 refresh();
