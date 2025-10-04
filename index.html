@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ドジャース減量シーズン・ダッシュボード（完全統合＋食事明細）</title>
+<title>ドジャース減量シーズン・ダッシュボード（完全統合＋食事明細＋NEXT GAME自動）</title>
 <style>
   :root{
     --ink:#111827; --muted:#6b7280; --border:#e5e7eb; --bg:#f9fafb; --card:#ffffff; --brand:#1f2937;
@@ -28,9 +28,7 @@
   .kv{background:#f3f4f6; border:1px solid var(--border); border-radius:10px; padding:6px 10px; font-size:13px}
   .scroll{overflow-x:auto; -webkit-overflow-scrolling:touch;}
   .pill{display:inline-block; background:#eef2ff; color:#3730a3; border-radius:999px; padding:2px 8px; font-size:12px}
-
   .span-6{grid-column: span 6} .span-4{grid-column: span 4} .span-8{grid-column: span 8} .span-12{grid-column: span 12}
-
   @media (max-width: 768px){
     .grid{grid-template-columns: repeat(6,1fr); gap:10px;}
     .span-6,.span-4,.span-8,.span-12{grid-column: 1 / -1;}
@@ -39,16 +37,17 @@
   }
   .small{font-size:12px}
   .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
-  input{padding:8px; border:1px solid #d1d5db; border-radius:8px;}
+  input, textarea{padding:8px; border:1px solid #d1d5db; border-radius:8px; font-family:inherit; font-size:14px;}
   button{padding:8px 12px; border-radius:10px; border:1px solid var(--brand); background:var(--brand); color:#fff; cursor:pointer}
   button.ghost{background:#fff; color:var(--brand); border-color:#d1d5db}
+  details summary{cursor:pointer; user-select:none}
 </style>
 </head>
 <body>
   <div class="wrap">
     <header>
-      <h1>ドジャース減量シーズン・ダッシュボード（完全統合＋食事明細）</h1>
-      <div class="muted">Googleシート <code>games</code> を読み込み：打撃・栄養・試合結果／NL西スタンディング（実力重みシミュレーション）／タイトル争い／ターゲット評価／NEXT GAME／<b>食事明細</b> を表示。</div>
+      <h1>ドジャース減量シーズン・ダッシュボード（完全統合＋食事明細＋NEXT GAME自動）</h1>
+      <div class="muted">Googleシート <code>games</code> を読み込み：打撃・栄養・試合結果／<b>NL西スタンディング（実力重みシミュレーション）</b>／<b>タイトル争い</b>／<b>ターゲット評価</b>／<b>NEXT GAME（自動）</b>／<b>食事明細</b> を表示。</div>
     </header>
 
     <section class="grid">
@@ -143,12 +142,26 @@
         <div class="small muted" style="margin-top:6px">設定はブラウザの localStorage に保存。</div>
       </div>
 
-      <div class="card span-12">
-        <h2>NEXT GAME（あすの対戦相手）</h2>
-        <div style="display:flex;gap:8px">
-          <input id="nextGame" placeholder="例：LAD @ SD（パドレス）" style="flex:1">
-          <button id="saveNext" class="ghost">保存</button>
+      <div class="card span-6">
+        <h2>最新試合 & NEXT GAME（自動）</h2>
+        <div class="kvs">
+          <div class="kv">最新試合 <strong id="latestGame">-</strong></div>
+          <div class="kv">NEXT GAME <strong id="nextAuto">-</strong></div>
         </div>
+        <div class="small muted" style="margin-top:6px">内蔵スケジュールは2025年の公式日程に近い並び。必要に応じて下のJSONから編集できます。</div>
+      </div>
+
+      <div class="card span-6">
+        <h2>スケジュール編集（JSON）</h2>
+        <details>
+          <summary>開く / 閉じる</summary>
+          <div class="small muted" style="margin:6px 0">このJSONの <code>series</code> に並ぶ対戦順（相手・ホーム/ビジター）を編集可。保存不要・即時反映。</div>
+          <textarea id="schedJson" style="width:100%; min-height:220px;"></textarea>
+          <div style="margin-top:8px">
+            <button id="apply">反映</button>
+            <span id="applyMsg" class="small muted" style="margin-left:8px"></span>
+          </div>
+        </details>
       </div>
     </section>
   </div>
@@ -167,6 +180,68 @@ const TEAM_STRENGTH = {
   "Dバックス": 0.490,
   "ロッキーズ": 0.430,
 };
+
+// ▼ 内蔵スケジュール（2025に近い並び）
+let SCHEDULE = {
+  start: "2025-03-30",
+  series: [
+    {"opp":"ジャイアンツ","ha":"H","len":3},
+    {"opp":"パドレス","ha":"H","len":4},
+    {"opp":"Dバックス","ha":"H","len":3},
+    {"opp":"カージナルス","ha":"A","len":3},
+    {"opp":"ロッキーズ","ha":"A","len":3},
+    {"opp":"ナショナルズ","ha":"H","len":3},
+    {"opp":"メッツ","ha":"H","len":4},
+    {"opp":"カブス","ha":"A","len":3},
+    {"opp":"ブレーブス","ha":"A","len":3},
+    {"opp":"フィリーズ","ha":"H","len":3},
+    {"opp":"ヤンキース","ha":"H","len":3},
+    {"opp":"Dバックス","ha":"H","len":3},
+    {"opp":"ジャイアンツ","ha":"A","len":3},
+    {"opp":"パドレス","ha":"A","len":4},
+    {"opp":"ロッキーズ","ha":"H","len":3},
+    {"opp":"アストロズ","ha":"A","len":3},
+    {"opp":"マリナーズ","ha":"A","len":2},
+    {"opp":"レンジャーズ","ha":"H","len":3},
+    {"opp":"レッズ","ha":"H","len":3},
+    {"opp":"ブルワーズ","ha":"A","len":3},
+    {"opp":"パイレーツ","ha":"A","len":3},
+    {"opp":"マリナーズ","ha":"H","len":2},
+    {"opp":"エンゼルス","ha":"H","len":3},
+    {"opp":"ナショナルズ","ha":"A","len":3},
+    {"opp":"マーリンズ","ha":"A","len":3},
+    {"opp":"カージナルス","ha":"H","len":3},
+    {"opp":"ロッキーズ","ha":"A","len":3},
+    {"opp":"ジャイアンツ","ha":"H","len":3},
+    {"opp":"パドレス","ha":"H","len":3},
+    {"opp":"Dバックス","ha":"A","len":3},
+    {"opp":"フィリーズ","ha":"A","len":3},
+    {"opp":"ブルージェイズ","ha":"A","len":2},
+    {"opp":"レイズ","ha":"A","len":2},
+    {"opp":"メッツ","ha":"A","len":3},
+    {"opp":"ブレーブス","ha":"H","len":3},
+    {"opp":"カブス","ha":"H","len":3},
+    {"opp":"レッズ","ha":"A","len":3},
+    {"opp":"ブルワーズ","ha":"H","len":3},
+    {"opp":"パイレーツ","ha":"H","len":3},
+    {"opp":"ロッキーズ","ha":"H","len":3}
+  ]
+};
+function expandDays(schedule){
+  const out=[];
+  const start=new Date(schedule.start+"T00:00:00");
+  let cur=new Date(start);
+  schedule.series.forEach(s=>{
+    for(let i=0;i<s.len;i++){
+      out.push({date:cur.toISOString().slice(0,10), opp:s.opp, ha:s.ha});
+      cur.setDate(cur.getDate()+1);
+    }
+    // 1日オフ
+    cur.setDate(cur.getDate()+1);
+  });
+  return out;
+}
+let EXPANDED = expandDays(SCHEDULE);
 
 // ===== GViz fetch =====
 function gvizUrl(){
@@ -205,13 +280,12 @@ function clamp(x, lo, hi){ return Math.max(lo, Math.min(hi, x)); }
 function seedFromString(str){ let h=2166136261>>>0; for(let i=0;i<str.length;i++){h^=str.charCodeAt(i); h=Math.imul(h,16777619);} return h>>>0; }
 function rng(seed){ let x=seed>>>0; return function(){ x^=x<<13; x^=x>>>17; x^=x<<5; return ((x>>>0)/4294967296);}}
 
-// ===== 計算（実力重みで非LAD戦を決定） =====
+// ===== シミュレーション＆集計 =====
 function compute(rows, enableSim){
   let G=0,AB=0,H=0,HR=0,RBI=0,R=0,BB=0,TB=0; let lastK='-',lastC='-',lastP='-',lastF='-';
   const standings={"ドジャース":{w:0,l:0},"ジャイアンツ":{w:0,l:0},"パドレス":{w:0,l:0},"Dバックス":{w:0,l:0},"ロッキーズ":{w:0,l:0}};
   const logRows=[]; const datesSet=new Set();
 
-  // 1) LAD戦：実データ反映
   rows.forEach(r=>{
     const date=r.date||r.Date||r.DATE; const opp=normTeam(r.opponent||r.Opponent||r.OPP);
     const ds=Number(r.dodgers_runs||r.Dodgers||r.ds||0); const os=Number(r.opp_runs||r.Opp||r.os||0);
@@ -220,13 +294,11 @@ function compute(rows, enableSim){
     const rbi=Number(r.RBI||r.rbi||0); const rr=Number(r.R||r.r||0); const bb=Number(r.BB||r.bb||0);
     let tb=Number(r.TB||r.tb||0); const kcal=r.kcal_total??r.kcal??'-'; const carb=r.carb_total??r.carb??'-';
     const prot=r.prot_total??r.prot??'-'; const fat=r.fat_total??r.fat??'-'; const comment=r.comment||'';
-    // 追加：食事明細
     const breakfast=r.breakfast || r.BREAKFAST || r.Breakfast || "";
     const lunch=r.lunch || r.LUNCH || r.Lunch || "";
     const dinner=r.dinner || r.DINNER || r.Dinner || "";
     const snack=r.snack || r.SNACK || r.Snack || "";
     const drink=r.drink || r.DRINK || r.Drink || "";
-
     if(!tb||tb===0){tb=h+3*hr;}
     G+=1; AB+=ab; H+=h; HR+=hr; RBI+=rbi; R+=rr; BB+=bb; TB+=tb; lastK=kcal; lastC=carb; lastP=prot; lastF=fat;
     if(res==='W'){standings['ドジャース'].w++; if(standings[opp]) standings[opp].l++;}
@@ -235,7 +307,6 @@ function compute(rows, enableSim){
     if(date) datesSet.add(String(date));
   });
 
-  // 2) 非LAD試合：実力重みで確率決定（決定論的）
   if(enableSim){
     const dates=Array.from(datesSet).sort();
     const pool=['ジャイアンツ','パドレス','Dバックス','ロッキーズ'];
@@ -243,8 +314,6 @@ function compute(rows, enableSim){
       const todaysOpps=rows.filter(r=>String(r.date||r.Date||r.DATE)===d).map(r=>normTeam(r.opponent||r.Opponent||r.OPP));
       const remain=pool.filter(t=>!todaysOpps.includes(t));
       const r=rng(seedFromString(d+'|NLW|weighted'));
-
-      // マッチング（安定シャッフル）
       const arr=remain.slice();
       for(let i=arr.length-1;i>0;i--){const j=Math.floor(r()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]];}
       for(let i=0;i+1<arr.length;i+=2){
@@ -281,27 +350,22 @@ function titleRanks(t){
     const top = pool[0];
     return {pos, topName:top.n, topVal: isRate? top.v.toFixed(3) : top.v, you: isRate? (isNaN(yourVal)? ".000" : yourVal.toFixed(3)) : yourVal};
   }
-
   const rAvg = rank(avgLeaders, isNaN(youAVG)?0:youAVG, true);
   const rHr  = rank(hrLeaders, youHR, false);
   const rRbi = rank(rbiLeaders, youRBI, false);
   const rR   = rank(rLeaders, youR, false);
-
   document.getElementById("rankAVGPos").textContent = `${rAvg.pos}位`;
   document.getElementById("rankAVGName").textContent = avgLeaders[0].n;
   document.getElementById("rankAVGTop").textContent = rAvg.topVal;
   document.getElementById("rankAVGYou").textContent = rAvg.you;
-
   document.getElementById("rankHRPos").textContent = `${rHr.pos}位`;
   document.getElementById("rankHRName").textContent = hrLeaders[0].n;
   document.getElementById("rankHRTop").textContent = rHr.topVal;
   document.getElementById("rankHRYou").textContent = rHr.you;
-
   document.getElementById("rankRBIPos").textContent = `${rRbi.pos}位`;
   document.getElementById("rankRBIName").textContent = rbiLeaders[0].n;
   document.getElementById("rankRBITop").textContent = rRbi.topVal;
   document.getElementById("rankRBIYou").textContent = rRbi.you;
-
   document.getElementById("rankRPos").textContent = `${rR.pos}位`;
   document.getElementById("rankRName").textContent = rLeaders[0].n;
   document.getElementById("rankRTop").textContent = rR.topVal;
@@ -332,23 +396,43 @@ function judgeDay(tot,tgt){
   if(kcal<tgt.calLow){msgs.push(`エネルギー不足（${kcal} < ${tgt.calLow}kcal）`); bad++;}
   else if(kcal>tgt.calHigh){msgs.push(`エネルギー過多（${kcal} > ${tgt.calHigh}kcal）`); bad++;}
   else {msgs.push(`エネルギーOK（${kcal}kcal）`); good++;}
-
   if(carb<tgt.carbLow){msgs.push(`糖質少なめ（${carb} < ${tgt.carbLow}g）`); bad++;}
   else if(carb>tgt.carbHigh){msgs.push(`糖質多め（${carb} > ${tgt.carbHigh}g）`); bad++;}
   else {msgs.push(`糖質OK（${carb}g）`); good++;}
-
   if(prot<tgt.prot){msgs.push(`P不足（${prot} < ${tgt.prot}g）`); bad++;}
   else {msgs.push(`P OK（${prot}g）`); good++;}
-
   if(fat<tgt.fatLow){msgs.push(`脂質少なめ（${fat} < ${tgt.fatLow}g）`); bad++;}
   else if(fat>tgt.fatHigh){msgs.push(`脂質多め（${fat} > ${tgt.fatHigh}g）`); bad++;}
   else {msgs.push(`脂質OK（${fat}g）`); good++;}
-
   document.getElementById("judge").innerHTML = msgs.map(m=>`<div>${m}</div>`).join("");
-
   if(bad===0 && good>=3){ badge.textContent="◎ 達成"; badge.style.display="inline-block"; }
   else if(good>=2){ badge.textContent="△ もう一歩"; badge.style.display="inline-block"; }
   else{ badge.textContent="× 要調整"; badge.style.display="inline-block"; }
+}
+
+// ===== NEXT GAME（自動表示） =====
+function expandDays(schedule){ // already defined above for initial EXPANDED, but keep for editor re-use
+  const out=[];
+  const start=new Date(schedule.start+"T00:00:00");
+  let cur=new Date(start);
+  schedule.series.forEach(s=>{
+    for(let i=0;i<s.len;i++){
+      out.push({date:cur.toISOString().slice(0,10), opp:s.opp, ha:s.ha});
+      cur.setDate(cur.getDate()+1);
+    }
+    cur.setDate(cur.getDate()+1);
+  });
+  return out;
+}
+function findNextOpponent(lastDateStr){
+  if(!EXPANDED || !EXPANDED.length) return null;
+  const d = new Date(lastDateStr+"T00:00:00");
+  d.setDate(d.getDate()+1);
+  const target = d.toISOString().slice(0,10);
+  for(const g of EXPANDED){
+    if(g.date >= target){ return g; }
+  }
+  return EXPANDED[0]; // wrap
 }
 
 // ===== レンダリング =====
@@ -389,14 +473,23 @@ function render(totals, standings, logRows){
     logBody.appendChild(tr);
   });
 
-  // title ranks
+  // title ranks + target judge
   titleRanks(totals);
-
-  // target judge
   judgeDay(totals, loadTargets());
+
+  // NEXT GAME（自動）
+  const latest = logRows[logRows.length-1];
+  if(latest && latest.date){
+    document.getElementById("latestGame").textContent = `${latest.date} vs ${latest.opp}（${latest.ds}-${latest.os}）`;
+    const nx = findNextOpponent(String(latest.date));
+    document.getElementById("nextAuto").textContent = nx ? `LAD ${nx.ha==='H'?'vs':'@'} ${nx.opp} / ${nx.date}` : "-";
+  }else{
+    document.getElementById("latestGame").textContent = "-";
+    document.getElementById("nextAuto").textContent = "-";
+  }
 }
 
-// ===== 初期化 =====
+// ===== リフレッシュ＆初期化 =====
 let SIM_ENABLED = true;
 async function refresh(){
   try{
@@ -433,12 +526,22 @@ function init(){
   const simToggle=document.getElementById("simToggle");
   if(simToggle){ SIM_ENABLED = simToggle.checked; simToggle.addEventListener("change", ()=>{ SIM_ENABLED = simToggle.checked; refresh(); }); }
 
-  // NEXT GAME memo
-  const LS_KEY='dodgers_next_game_note';
-  const v=localStorage.getItem(LS_KEY)||"";
-  document.getElementById("nextGame").value = v;
-  document.getElementById("saveNext").addEventListener("click", ()=>{
-    localStorage.setItem(LS_KEY, document.getElementById("nextGame").value || "");
+  // JSON editor
+  const ta=document.getElementById("schedJson");
+  const apply=document.getElementById("apply");
+  const msg=document.getElementById("applyMsg");
+  ta.value = JSON.stringify(SCHEDULE, null, 2);
+  apply.addEventListener("click", ()=>{
+    try{
+      const obj=JSON.parse(ta.value);
+      if(!obj.start || !Array.isArray(obj.series)) throw new Error("start と series が必要です。");
+      SCHEDULE=obj; EXPANDED=expandDays(SCHEDULE);
+      msg.textContent="反映しました";
+      setTimeout(()=>msg.textContent="", 2000);
+      refresh();
+    }catch(e){
+      msg.textContent="エラー: "+e.message;
+    }
   });
 
   refresh();
