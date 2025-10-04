@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -254,12 +253,24 @@ async function fetchSheet(){
   if(!m) throw new Error("GViz応答の解析に失敗。公開設定・SHEET_ID・シート名(games)を確認してください。");
   const json = JSON.parse(m[1]);
   const cols = json.table.cols.map(c=>c.label || c.id);
+
+  // --- ここから：正規化（数値は生値v優先 / Date(...)→ISO） ---
   const rows = json.table.rows.map(r=>{
     const obj = {};
     cols.forEach((c,i)=>{
       const cell = r.c[i];
-      obj[c] = cell ? ((cell.f ?? cell.v)) : null;
+      let val = null;
+      if (cell) {
+        val = (cell.v !== null && cell.v !== undefined) ? cell.v : (cell.f ?? null);
+      }
+      if (typeof val === 'string' && /^Date\(/.test(val)) {
+        val = parseGvizDate(val); // "Date(YYYY,MM,DD)"→"YYYY-MM-DD"
+      }
+      obj[c] = val;
     });
+    // 代表カラム名を補助的に複写（あなたのシートに合わせて調整可）
+    if (obj['日付'] && !obj['date']) obj['date'] = obj['日付'];
+    if (obj['相手'] && !obj['opponent']) obj['opponent'] = obj['相手'];
     return obj;
   });
   return rows;
@@ -280,6 +291,22 @@ function clamp(x, lo, hi){ return Math.max(lo, Math.min(hi, x)); }
 function seedFromString(str){ let h=2166136261>>>0; for(let i=0;i<str.length;i++){h^=str.charCodeAt(i); h=Math.imul(h,16777619);} return h>>>0; }
 function rng(seed){ let x=seed>>>0; return function(){ x^=x<<13; x^=x>>>17; x^=x<<5; return ((x>>>0)/4294967296);}}
 function randn(r){ const u = r()||1e-9, v = r()||1e-9; return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+
+// --- normalization helpers（★追加） ---
+function toNumber(v){
+  if (v == null) return 0;
+  const s = String(v).trim().replace(/[ ,，]/g, '');
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+}
+// "Date(2025,9,4)" -> "2025-10-04"
+function parseGvizDate(s){
+  if (typeof s !== 'string') return s;
+  const m = s.match(/Date\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!m) return s;
+  const y = +m[1], mo = +m[2] + 1, d = +m[3];
+  return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
 
 // ===== スター進行シミュレーション（2025ベースライン） =====
 const STARS = [
@@ -309,27 +336,40 @@ function simulateStars(games){
 
 // ===== 集計（非LAD戦シミュ＋通算） =====
 function compute(rows, enableSim){
-  let G=0,AB=0,H=0,HR=0,RBI=0,R=0,BB=0,TB=0; let lastK='-',lastC='-',lastP='-',lastF='-';
+  let G=0,AB=0,H=0,HR=0,RBI=0,R=0,BB=0,TB=0; let lastK=0,lastC=0,lastP=0,lastF=0;
   const standings={"ドジャース":{w:0,l:0},"ジャイアンツ":{w:0,l:0},"パドレス":{w:0,l:0},"Dバックス":{w:0,l:0},"ロッキーズ":{w:0,l:0}};
   const logRows=[]; const datesSet=new Set();
 
   rows.forEach(r=>{
-    const date=r.date||r.Date||r.DATE; const opp=normTeam(r.opponent||r.Opponent||r.OPP);
-    const ds=Number(r.dodgers_runs||r.Dodgers||r.ds||0); const os=Number(r.opp_runs||r.Opp||r.os||0);
+    const date=(r.date||r.Date||r.DATE||'');
+    const opp=normTeam(r.opponent||r.Opponent||r.OPP);
+    const ds=toNumber(r.dodgers_runs||r.Dodgers||r.ds||0);
+    const os=toNumber(r.opp_runs||r.Opp||r.os||0);
     const res=r.result || (ds>os?'W':(ds<os?'L':'T'));
-    const ab=Number(r.AB||r.ab||0); const h=Number(r.H||r.h||0); const hr=Number(r.HR||r.hr||0);
-    const rbi=Number(r.RBI||r.rbi||0); const rr=Number(r.R||r.r||0); const bb=Number(r.BB||r.bb||0);
-    let tb=Number(r.TB||r.tb||0); const kcal=r.kcal_total??r.kcal??'-'; const carb=r.carb_total??r.carb??'-';
-    const prot=r.prot_total??r.prot??'-'; const fat=r.fat_total??r.fat??'-'; const comment=r.comment||'';
+    const ab=toNumber(r.AB||r.ab||0);
+    const h =toNumber(r.H ||r.h ||0);
+    const hr=toNumber(r.HR||r.hr||0);
+    const rbi=toNumber(r.RBI||r.rbi||0);
+    const rr =toNumber(r.R ||r.r ||0);
+    const bb =toNumber(r.BB||r.bb||0);
+    let tb   =toNumber(r.TB||r.tb||0);
+    const kcal=toNumber(r.kcal_total??r.kcal??0);
+    const carb=toNumber(r.carb_total??r.carb??0);
+    const prot=toNumber(r.prot_total??r.prot??0);
+    const fat =toNumber(r.fat_total ??r.fat ??0);
+    const comment=r.comment||'';
     const breakfast=r.breakfast || r.BREAKFAST || r.Breakfast || "";
     const lunch=r.lunch || r.LUNCH || r.Lunch || "";
     const dinner=r.dinner || r.DINNER || r.Dinner || "";
     const snack=r.snack || r.SNACK || r.Snack || "";
     const drink=r.drink || r.DRINK || r.Drink || "";
     if(!tb||tb===0){tb=h+3*hr;}
-    G+=1; AB+=ab; H+=h; HR+=hr; RBI+=rbi; R+=rr; BB+=bb; TB+=tb; lastK=kcal; lastC=carb; lastP=prot; lastF=fat;
+    G+=1; AB+=ab; H+=h; HR+=hr; RBI+=rbi; R+=rr; BB+=bb; TB+=tb;
+    lastK=kcal; lastC=carb; lastP=prot; lastF=fat;
+
     if(res==='W'){standings['ドジャース'].w++; if(standings[opp]) standings[opp].l++;}
     else if(res==='L'){standings['ドジャース'].l++; if(standings[opp]) standings[opp].w++;}
+
     logRows.push({date,opp,ds,os,res,ab,h,hr,rbi,rr,bb,kcal,carb,prot,fat,comment,breakfast,lunch,dinner,snack,drink});
     if(date) datesSet.add(String(date));
   });
@@ -342,8 +382,12 @@ function compute(rows, enableSim){
       const remain=pool.filter(t=>!todaysOpps.includes(t));
       const r=rng(seedFromString(d+'|NLW|weighted'));
       const arr=remain.slice();
-      for(let i=arr.length-1;i>0;i--){const j=Math.floor(r()*(i+1)); [arr[i],arr[j]]=[arr[j]]=[arr[i]]; }
-      // NOTE: Fix swap typo above
+      for(let i=arr.length-1;i>0;i--){
+        const j=Math.floor(r()*(i+1));
+        // ★ タイポ修正：正しいスワップ
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      // ここで arr を使った勝敗付与等を行う場合は追記
     });
   }
 
@@ -389,7 +433,7 @@ function titleRanksProgress(totals){
   document.getElementById("rankRBIYou").textContent = rRbi.you;
 
   document.getElementById("rankRPos").textContent = `${rR.pos}位`;
-  document.getElementById("rankRName").textContent = rR.topName;
+  document.getElementById("rankRName").textContent = rR.name;
   document.getElementById("rankRTop").textContent = rR.topVal;
   document.getElementById("rankRYou").textContent = rR.you;
 }
@@ -410,7 +454,7 @@ function expandDays(schedule){ // duplicate for editor re-use
 }
 function findNextOpponent(lastDateStr){
   if(!EXPANDED || !EXPANDED.length) return null;
-  const d = new Date(lastDateStr+"T00:00:00");
+  const d = new Date(String(lastDateStr)+"T00:00:00");
   d.setDate(d.getDate()+1);
   const target = d.toISOString().slice(0,10);
   for(const g of EXPANDED){
@@ -429,7 +473,6 @@ function render(totals, standings, logRows){
   document.getElementById("PROT").textContent = totals.lastP ?? "-";
   document.getElementById("FAT").textContent  = totals.lastF ?? "-";
 
-  // standings（※ 上の compute でのシャッフルにバグがあったため、ここでは standings はそのまま表示のみ）
   const teams = Object.keys(standings).map(n=>({name:n, ...standings[n]}));
   teams.sort((a,b)=>{
     const pa = a.w/(a.w+a.l||1), pb = b.w/(b.w+b.l||1);
@@ -483,6 +526,24 @@ async function refresh(){
     console.error(e);
     alert("シートの読み込みに失敗：公開設定 / SHEET_ID / シート名(games) をご確認ください。");
   }
+}
+function loadTargets(){
+  try{
+    const raw = localStorage.getItem('lad.targets.v1');
+    return raw ? JSON.parse(raw) : {calLow:1900,calHigh:2100,carbLow:150,carbHigh:200,prot:120,fatLow:50,fatHigh:60};
+  }catch(e){ return {calLow:1900,calHigh:2100,carbLow:150,carbHigh:200,prot:120,fatLow:50,fatHigh:60}; }
+}
+function saveTargets(t){
+  localStorage.setItem('lad.targets.v1', JSON.stringify(t));
+}
+function fillTargets(t){
+  document.getElementById("tCalLow").value = t.calLow;
+  document.getElementById("tCalHigh").value= t.calHigh;
+  document.getElementById("tCarbLow").value= t.carbLow;
+  document.getElementById("tCarbHigh").value= t.carbHigh;
+  document.getElementById("tProt").value   = t.prot;
+  document.getElementById("tFatLow").value = t.fatLow;
+  document.getElementById("tFatHigh").value= t.fatHigh;
 }
 function init(){
   // Targets
