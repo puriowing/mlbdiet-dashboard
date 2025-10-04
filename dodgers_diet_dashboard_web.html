@@ -1,0 +1,226 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dodgers Diet Dashboard – Web版（Google Sheets連携）</title>
+<style>
+  :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--ink:#111827;}
+  body{font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif; margin: 24px; line-height:1.55; color:var(--ink);}
+  h1{font-size:24px;margin:0 0 8px}
+  h2{font-size:18px;margin:18px 0 8px}
+  .muted{color:var(--muted); font-size:12px}
+  .grid{display:grid; grid-template-columns: repeat(auto-fit,minmax(320px,1fr)); gap:16px;}
+  .card{border:1px solid var(--border); border-radius:12px; padding:16px; background:white; box-shadow:0 1px 2px rgba(0,0,0,.04);}
+  table{width:100%; border-collapse:collapse; font-size:14px}
+  th,td{padding:8px; border-bottom:1px solid var(--border); text-align:left}
+  th{background:var(--bg); font-weight:600}
+  .small{font-size:12px}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:12px}
+  .ok{color:#065f46}
+  .warn{color:#92400e}
+</style>
+</head>
+<body>
+  <h1>ドジャース減量シーズン・ダッシュボード（Web版）</h1>
+  <div class="muted small">このページは公開Googleスプレッドシートのデータを読み込み、常に最新に更新します。</div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>設定</h2>
+      <div class="small">下の <code>SHEET_ID</code> をあなたのスプレッドシートIDに置き換えて公開してください。</div>
+      <div class="small">シート名は <strong>games</strong> を想定。列は下記のCSVヘッダーと揃えてください。</div>
+      <pre class="small">date,opponent,dodgers_runs,opp_runs,result,AB,H,HR,RBI,R,BB,TB,comment,kcal_total,carb_total,prot_total,fat_total</pre>
+      <div class="small">※ TB（塁打）は 1B+2×2B+3×3B+4×HR。わからない場合は空でも可（自動で H と HR から推計: TB≈H+3×HR）。</div>
+    </div>
+
+    <div class="card">
+      <h2>通算打撃成績</h2>
+      <table>
+        <tbody>
+          <tr><th>試合</th><td id="G">-</td></tr>
+          <tr><th>打数（AB）</th><td id="AB">-</td></tr>
+          <tr><th>安打（H）</th><td id="H">-</td></tr>
+          <tr><th>本塁打（HR）</th><td id="HR">-</td></tr>
+          <tr><th>打点（RBI）</th><td id="RBI">-</td></tr>
+          <tr><th>得点（R）</th><td id="R">-</td></tr>
+          <tr><th>四球（BB）</th><td id="BB">-</td></tr>
+          <tr><th>塁打（TB）</th><td id="TB">-</td></tr>
+          <tr><th>打率（AVG）</th><td id="AVG">-</td></tr>
+          <tr><th>出塁率（OBP）</th><td id="OBP">-</td></tr>
+          <tr><th>長打率（SLG）</th><td id="SLG">-</td></tr>
+          <tr><th>OPS</th><td id="OPS">-</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>栄養：直近日の合計</h2>
+      <table>
+        <tbody>
+          <tr><th>エネルギー</th><td id="KCAL">-</td></tr>
+          <tr><th>糖質</th><td id="CARB">-</td></tr>
+          <tr><th>たんぱく質</th><td id="PROT">-</td></tr>
+          <tr><th>脂質</th><td id="FAT">-</td></tr>
+        </tbody>
+      </table>
+      <div class="small muted">※ 日次合計は各日の行の合計値（複数行で同日を入れる場合は日単位で集計するよう拡張してください）。</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>ナ・リーグ西地区（Standings風）</h2>
+      <table id="nlw">
+        <thead><tr><th>順位</th><th>チーム</th><th>勝</th><th>敗</th><th>勝率</th><th>GB</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="small muted">※ ドジャースと相手は自動集計。他3球団の勝敗は別シートで管理するか、この表の下の手動設定で補完してください。</div>
+    </div>
+
+    <div class="card">
+      <h2>試合ログ</h2>
+      <table id="gameLog">
+        <thead>
+          <tr><th>日付</th><th>対戦相手</th><th>スコア</th><th>結果</th><th>成績（AB-H HR RBI R BB）</th><th>栄養(kcal/C/P/F)</th><th>コメント</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+// ====== 設定 ======
+const SHEET_ID = "1b3oO6nDY1d-jmP2cFchm7ld5PvKIr34vh0KXYYKxx8I"; // ←あなたのスプレッドシートID
+const SHEET_NAME = "games";
+const REFRESH_SEC = 60;
+
+// ====== 取得URL（GViz JSON） ======
+function gvizUrl(){
+  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
+}
+
+// ====== GViz JSON のパース ======
+async function fetchSheet(){
+  const res = await fetch(gvizUrl());
+  const txt = await res.text();
+  const m = txt.match(/setResponse\\(([\\s\\S]*)\\)/);
+  if(!m){ throw new Error("GViz応答の形式が想定外です。公開設定とSHEET_IDを確認してください。"); }
+  const json = JSON.parse(m[1]);
+  const cols = json.table.cols.map(c=>c.label || c.id);
+  const rows = json.table.rows.map(r=>{
+    const obj = {};
+    cols.forEach((c, i)=>{
+      const cell = r.c[i];
+      obj[c] = cell ? (cell.v!==undefined? cell.v : cell.f) : null;
+    });
+    return obj;
+  });
+  return {cols, rows};
+}
+
+// ====== Standings 計算（NL West） ======
+const TEAMS = ["ドジャース","ジャイアンツ","パドレス","Dバックス","ロッキーズ"];
+function pct(w,l){ const g=w+l; return g===0? ".000" : (Math.round((w/g)*1000)/1000).toFixed(3).padStart(5,'0'); }
+function gb(leaderW, leaderL, w, l){ const v=((leaderW-w)+(l-leaderL))/2; return v===0? "-" : v.toFixed(1); }
+
+function computeFromRows(rows){
+  let G=0, AB=0, H=0, HR=0, RBI=0, R=0, BB=0, TB=0;
+  let lastK=0, lastC=0, lastP=0, lastF=0;
+
+  const standings = {
+    "ドジャース": {w:0,l:0},
+    "ジャイアンツ": {w:0,l:0},
+    "パドレス": {w:0,l:0},
+    "Dバックス": {w:0,l:0},
+    "ロッキーズ": {w:0,l:0}
+  };
+
+  const logRows = [];
+
+  rows.forEach(r=>{
+    const date = r.date || r.Date || r.DATE;
+    const opp  = r.opponent || r.Opponent || r.OPP;
+    const ds   = Number(r.dodgers_runs || r.Dodgers || r.ds || 0);
+    const os   = Number(r.opp_runs || r.Opp || r.os || 0);
+    const res  = r.result || (ds>os?"W":(ds<os?"L":"T"));
+
+    const ab = Number(r.AB||r.ab||0);
+    const h  = Number(r.H||r.h||0);
+    const hr = Number(r.HR||r.hr||0);
+    const rbi= Number(r.RBI||r.rbi||0);
+    const rr = Number(r.R||r.r||0);
+    const bb = Number(r.BB||r.bb||0);
+    let tb   = Number(r.TB||r.tb||0);
+    const kcal = Math.round(Number(r.kcal_total||r.kcal||0));
+    const carb = Number(r.carb_total||r.carb||0);
+    const prot = Number(r.prot_total||r.prot||0);
+    const fat  = Number(r.fat_total ||r.fat ||0);
+    const comment = r.comment || "";
+
+    if(!tb || tb===0){ tb = h + 3*hr; }
+
+    G += 1; AB += ab; H += h; HR += hr; RBI += rbi; R += rr; BB += bb; TB += tb;
+    lastK = kcal; lastC = carb; lastP = prot; lastF = fat;
+
+    if(res==="W"){ standings["ドジャース"].w++; if(standings[opp]) standings[opp].l++; }
+    else if(res==="L"){ standings["ドジャース"].l++; if(standings[opp]) standings[opp].w++; }
+
+    logRows.push({date, opp, ds, os, res, ab, h, hr, rbi, rr, bb, kcal, carb, prot, fat, comment});
+  });
+
+  const AVG = AB>0 ? (H/AB).toFixed(3) : ".000";
+  const OBP = (AB+BB)>0 ? ((H+BB)/(AB+BB)).toFixed(3) : ".000";
+  const SLG = AB>0 ? (TB/AB).toFixed(3) : ".000";
+  const OPS = (parseFloat(OBP)+parseFloat(SLG)).toFixed(3);
+
+  return { totals:{G,AB,H,HR,RBI,R,BB,TB,AVG,OBP,SLG,OPS, lastK,lastC,lastP,lastF}, standings, logRows };
+}
+
+function render(totals, standings, logRows){
+  const ids = ["G","AB","H","HR","RBI","R","BB","TB","AVG","OBP","SLG","OPS"];
+  ids.forEach(id=>document.getElementById(id).textContent = totals[id] ?? "-");
+  document.getElementById("KCAL").textContent = totals.lastK? `${totals.lastK} kcal` : "-";
+  document.getElementById("CARB").textContent = totals.lastC? `${totals.lastC} g` : "-";
+  document.getElementById("PROT").textContent = totals.lastP? `${totals.lastP} g` : "-";
+  document.getElementById("FAT").textContent  = totals.lastF? `${totals.lastF} g` : "-";
+
+  const teams = Object.keys(standings).map(n=>({name:n, ...standings[n]}));
+  teams.sort((a,b)=>{
+    const pa = a.w/(a.w+a.l||1);
+    const pb = b.w/(b.w+b.l||1);
+    if(pb!==pa) return pb-pa;
+    return a.l - b.l;
+  });
+  const leader = teams[0];
+  const tbody = document.querySelector("#nlw tbody"); tbody.innerHTML="";
+  teams.forEach((t,i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${i+1}位</td><td>${t.name}</td><td>${t.w}</td><td>${t.l}</td>
+      <td>${pct(t.w,t.l)}</td><td>${gb(leader.w,leader.l,t.w,t.l)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  const logBody = document.querySelector("#gameLog tbody"); logBody.innerHTML="";
+  logRows.slice().reverse().forEach(g=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${g.date||""}</td><td>${g.opp||""}</td><td>${g.ds}-${g.os}</td><td>${g.res}</td>
+      <td>${g.ab}-${g.h} HR${g.hr} RBI${g.rbi} R${g.rr} BB${g.bb}</td>
+      <td>${g.kcal||0}/${g.carb||0}/${g.prot||0}/${g.fat||0}</td>
+      <td>${g.comment||""}</td>`;
+    logBody.appendChild(tr);
+  });
+}
+
+async function refresh(){
+  const {rows} = await fetchSheet();
+  const {totals, standings, logRows} = computeFromRows(rows);
+  render(totals, standings, logRows);
+}
+
+refresh();
+setInterval(refresh, REFRESH_SEC*1000);
+</script>
+</body>
+</html>
