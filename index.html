@@ -4,125 +4,209 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dodgers Diet Dashboard – Web版（Google Sheets連携・FIX）</title>
+
+<title>ドジャース減量シーズン・ダッシュボード（NL西5球団 自動スタンディング対応）</title>
+
 <style>
-  :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--ink:#111827;}
-  body{font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif; margin: 24px; line-height:1.55; color:var(--ink);}
-  h1{font-size:24px;margin:0 0 8px}
-  h2{font-size:18px;margin:18px 0 8px}
+  :root{
+    --ink:#111827; --muted:#6b7280; --border:#e5e7eb; --bg:#f9fafb; --card:#ffffff;
+    --brand:#1f2937; --accent:#2563eb; --ok:#065f46; --warn:#92400e; --bad:#991b1b;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; color:var(--ink);
+    font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+      "Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic", Meiryo, sans-serif;
+    background:var(--bg);
+  }
+  .wrap{max-width:1100px; margin:20px auto; padding:0 14px;}
+  header{margin:6px 0 16px;}
+  h1{font-size:22px; margin:0 0 6px;}
   .muted{color:var(--muted); font-size:12px}
-  .grid{display:grid; grid-template-columns: repeat(auto-fit,minmax(320px,1fr)); gap:16px;}
-  .card{border:1px solid var(--border); border-radius:12px; padding:16px; background:white; box-shadow:0 1px 2px rgba(0,0,0,.04);}
+  .grid{display:grid; grid-template-columns: repeat(12, 1fr); gap:14px;}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px;
+        box-shadow:0 1px 2px rgba(0,0,0,.04);}
+  h2{font-size:16px; margin:0 0 10px}
   table{width:100%; border-collapse:collapse; font-size:14px}
-  th,td{padding:8px; border-bottom:1px solid var(--border); text-align:left}
-  th{background:var(--bg); font-weight:600}
+  th,td{padding:8px 10px; border-bottom:1px solid var(--border); text-align:left; white-space:nowrap;}
+  th{background:#f3f4f6; font-weight:600}
+  .scroll{overflow-x:auto; -webkit-overflow-scrolling:touch;}
   .small{font-size:12px}
+  .kvs{display:flex; gap:12px; flex-wrap:wrap}
+  .kv{background:#f3f4f6; border:1px solid var(--border); border-radius:10px; padding:8px 10px; font-size:13px}
+
+  .span-6{grid-column: span 6}
+  .span-4{grid-column: span 4}
+  .span-8{grid-column: span 8}
+  .span-12{grid-column: span 12}
+
+  @media (max-width: 768px){
+    .grid{grid-template-columns: repeat(6, 1fr); gap:10px;}
+    .span-6,.span-8,.span-12,.span-4{grid-column: 1 / -1;}
+    th,td{padding:8px 6px; font-size:13px}
+    h1{font-size:20px}
+    h2{font-size:15px}
+  }
 </style>
 </head>
 <body>
-  <h1>ドジャース減量シーズン・ダッシュボード（Web版/FIX）</h1>
-  <div class="muted small">Googleスプレッドシートのデータを自動取得して表示します。数値が出ない場合は、SHEET_ID・公開設定・シート名(games)・ヘッダーを確認してください。</div>
+  <div class="wrap">
+    <header>
+      <h1>ドジャース減量シーズン・ダッシュボード（Web連携 / NL西スタンディング自動）</h1>
+      <div class="muted">Googleスプレッドシートの <code>games</code> から打撃・栄養・試合結果を読み込み、<b>NL西5球団の勝敗を自動集計</b>します。</div>
+    </header>
 
-  <div class="grid">
-    <div class="card">
-      <h2>設定</h2>
-      <div class="small">このHTMLの <code>SHEET_ID</code> をあなたのシートIDに置き換えてください。シート名は <strong>games</strong>。</div>
-      <pre class="small">date,opponent,dodgers_runs,opp_runs,result,AB,H,HR,RBI,R,BB,TB,comment,kcal_total,carb_total,prot_total,fat_total</pre>
-    </div>
+    <section class="grid">
+      <div class="card span-6">
+        <h2>通算打撃成績</h2>
+        <div class="kvs">
+          <div class="kv">試合 <strong id="G">-</strong></div>
+          <div class="kv">AB <strong id="AB">-</strong></div>
+          <div class="kv">H <strong id="H">-</strong></div>
+          <div class="kv">HR <strong id="HR">-</strong></div>
+          <div class="kv">RBI <strong id="RBI">-</strong></div>
+          <div class="kv">R <strong id="R">-</strong></div>
+          <div class="kv">BB <strong id="BB">-</strong></div>
+          <div class="kv">TB <strong id="TB">-</strong></div>
+        </div>
+        <div class="kvs" style="margin-top:8px">
+          <div class="kv">AVG <strong id="AVG">.000</strong></div>
+          <div class="kv">OBP <strong id="OBP">.000</strong></div>
+          <div class="kv">SLG <strong id="SLG">.000</strong></div>
+          <div class="kv">OPS <strong id="OPS">.000</strong></div>
+        </div>
+      </div>
 
-    <div class="card">
-      <h2>通算打撃成績</h2>
-      <table>
-        <tbody>
-          <tr><th>試合</th><td id="G">-</td></tr>
-          <tr><th>打数（AB）</th><td id="AB">-</td></tr>
-          <tr><th>安打（H）</th><td id="H">-</td></tr>
-          <tr><th>本塁打（HR）</th><td id="HR">-</td></tr>
-          <tr><th>打点（RBI）</th><td id="RBI">-</td></tr>
-          <tr><th>得点（R）</th><td id="R">-</td></tr>
-          <tr><th>四球（BB）</th><td id="BB">-</td></tr>
-          <tr><th>塁打（TB）</th><td id="TB">-</td></tr>
-          <tr><th>打率（AVG）</th><td id="AVG">-</td></tr>
-          <tr><th>出塁率（OBP）</th><td id="OBP">-</td></tr>
-          <tr><th>長打率（SLG）</th><td id="SLG">-</td></tr>
-          <tr><th>OPS</th><td id="OPS">-</td></tr>
-        </tbody>
-      </table>
-    </div>
+      <div class="card span-6">
+        <h2>栄養（直近日の合計）</h2>
+        <div class="kvs">
+          <div class="kv">kcal <strong id="KCAL">-</strong></div>
+          <div class="kv">糖質 <strong id="CARB">-</strong></div>
+          <div class="kv">P <strong id="PROT">-</strong></div>
+          <div class="kv">F <strong id="FAT">-</strong></div>
+        </div>
+        <div id="judge" class="small" style="margin-top:8px;color:#6b7280">ターゲット設定に基づいて当日の判定を表示します。</div>
+      </div>
 
-    <div class="card">
-      <h2>栄養：直近日の合計</h2>
-      <table>
-        <tbody>
-          <tr><th>エネルギー</th><td id="KCAL">-</td></tr>
-          <tr><th>糖質</th><td id="CARB">-</td></tr>
-          <tr><th>たんぱく質</th><td id="PROT">-</td></tr>
-          <tr><th>脂質</th><td id="FAT">-</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+      <div class="card span-8">
+        <h2>試合ログ</h2>
+        <div class="scroll">
+          <table id="gameLog">
+            <thead>
+              <tr><th>日付</th><th>対戦相手</th><th>スコア</th><th>結果</th><th>成績（AB-H HR RBI R BB）</th><th>栄養(kcal/C/P/F)</th><th>コメント</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
 
-  <div class="grid">
-    <div class="card">
-      <h2>ナ・リーグ西地区（Standings風）</h2>
-      <table id="nlw">
-        <thead><tr><th>順位</th><th>チーム</th><th>勝</th><th>敗</th><th>勝率</th><th>GB</th></tr></thead>
-        <tbody></tbody>
-      </table>
-      <div class="small muted">※ ドジャースと対戦相手は自動集計。他3球団は別途補完してください。</div>
-    </div>
+      <div class="card span-4">
+        <h2>ナ・リーグ西地区（Standings）</h2>
+        <div class="scroll">
+          <table id="nlw">
+            <thead><tr><th>順位</th><th>チーム</th><th>勝</th><th>敗</th><th>勝率</th><th>GB</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="small muted">※ 5球団すべて、LAD戦の結果から自動集計されます。</div>
+      </div>
 
-    <div class="card">
-      <h2>試合ログ</h2>
-      <table id="gameLog">
-        <thead>
-          <tr><th>日付</th><th>対戦相手</th><th>スコア</th><th>結果</th><th>成績（AB-H HR RBI R BB）</th><th>栄養(kcal/C/P/F)</th><th>コメント</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
+      <div class="card span-6">
+        <h2>MLB タイトル争い（スター比較・演出）</h2>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>タイトル</th><th>順位</th><th>トップ選手</th><th>トップ値</th><th>あなた</th></tr></thead>
+            <tbody>
+              <tr><td>首位打者</td><td id="rankAVGPos">-</td><td id="rankAVGName">-</td><td id="rankAVGTop">-</td><td id="rankAVGYou">-</td></tr>
+              <tr><td>本塁打王</td><td id="rankHRPos">-</td><td id="rankHRName">-</td><td id="rankHRTop">-</td><td id="rankHRYou">-</td></tr>
+              <tr><td>打点王</td><td id="rankRBIPos">-</td><td id="rankRBIName">-</td><td id="rankRBITop">-</td><td id="rankRBIYou">-</td></tr>
+              <tr><td>得点王</td><td id="rankRPos">-</td><td id="rankRName">-</td><td id="rankRTop">-</td><td id="rankRYou">-</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card span-6">
+        <h2>ターゲット設定（1日）</h2>
+        <div class="kvs">
+          <div class="kv">kcal <input id="tCalLow" type="number" value="1900" style="width:90px">〜<input id="tCalHigh" type="number" value="2100" style="width:90px"></div>
+          <div class="kv">糖質g <input id="tCarbLow" type="number" value="150" style="width:80px">〜<input id="tCarbHigh" type="number" value="200" style="width:80px"></div>
+          <div class="kv">P目標g <input id="tProt" type="number" value="120" style="width:90px"></div>
+          <div class="kv">脂質g <input id="tFatLow" type="number" value="50" style="width:80px">〜<input id="tFatHigh" type="number" value="60" style="width:80px"></div>
+        </div>
+        <div style="margin-top:8px">
+          <button id="saveTargets">ターゲット保存</button>
+          <button id="resetTargets" class="small" style="margin-left:8px">初期値</button>
+        </div>
+        <div class="small muted" style="margin-top:6px">設定はブラウザの localStorage に保存。</div>
+      </div>
+
+      <div class="card span-12">
+        <h2>NEXT GAME（あすの対戦相手）</h2>
+        <div style="display:flex;gap:8px">
+          <input id="nextGame" placeholder="例：LAD @ SD（パドレス）" style="flex:1;padding:8px;border:1px solid #d1d5db;border-radius:8px">
+          <button id="saveNext">保存</button>
+        </div>
+        <div class="small muted" style="margin-top:6px">※ メモはブラウザに保存されます。</div>
+      </div>
+    </section>
+
+    <footer style="text-align:center;margin:20px 0;color:#6b7280" class="small">© Dodgers Diet Dashboard – NL West auto standings</footer>
   </div>
 
 <script>
-const SHEET_ID = "1b3oO6nDY1d-jmP2cFchm7ld5PvKIr34vh0KXYYKxx8I";
+// ===== 設定 =====
+const SHEET_ID = "1b3oO6nDY1d-jmP2cFchm7ld5PvKIr34vh0KXYYKxx8I"; // ←あなたのシートIDに置換
 const SHEET_NAME = "games";
-const REFRESH_SEC = 10;
+const REFRESH_SEC = 20;
 
+// ===== GViz fetch =====
 function gvizUrl(){
   return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
 }
-
 async function fetchSheet(){
   const res = await fetch(gvizUrl());
   const txt = await res.text();
   const m = txt.match(/setResponse\(([\s\S]*)\)/);
-  if(!m){ throw new Error("GViz応答の形式が想定外です。"); }
+  if(!m) throw new Error("GViz応答の解析に失敗。公開設定・SHEET_ID・シート名(games)を確認してください。");
   const json = JSON.parse(m[1]);
   const cols = json.table.cols.map(c=>c.label || c.id);
   const rows = json.table.rows.map(r=>{
     const obj = {};
-    cols.forEach((c, i)=>{
+    cols.forEach((c,i)=>{
       const cell = r.c[i];
-      obj[c] = cell ? ( (cell.f ?? cell.v) ) : null;
+      obj[c] = cell ? ((cell.f ?? cell.v)) : null;
     });
     return obj;
   });
-  return {cols, rows};
+  return rows;
 }
 
-function pct(w,l){ const g=w+l; return g===0? ".000" : (Math.round((w/g)*1000)/1000).toFixed(3).padStart(5,'0'); }
+// ===== Util =====
+function pct(w,l){ const g=w+l; return g? (Math.round((w/g)*1000)/1000).toFixed(3).padStart(5,'0') : ".000"; }
 function gb(leaderW, leaderL, w, l){ const v=((leaderW-w)+(l-leaderL))/2; return v===0? "-" : v.toFixed(1); }
+function normTeam(name){
+  if(!name) return null;
+  const s = String(name).toLowerCase();
+  if(s.includes("巨")||s.includes("ジャイ")) return "ジャイアンツ";
+  if(s.includes("pad")||s.includes("パド")) return "パドレス";
+  if(s.includes("d-back")||s.includes("dバッ")||s.includes("dia")||s.includes("ダイア")) return "Dバックス";
+  if(s.includes("rock")||s.includes("ロッ")) return "ロッキーズ";
+  if(s.includes("dodg")||s.includes("ドジャ")) return "ドジャース";
+  return name; // 既に日本語表記ならそのまま
+}
 
-function computeFromRows(rows){
+// ===== 計算 =====
+function compute(rows){
   let G=0, AB=0, H=0, HR=0, RBI=0, R=0, BB=0, TB=0;
-  let lastK=0, lastC=0, lastP=0, lastF=0;
+  let lastK="-", lastC="-", lastP="-", lastF="-";
   const standings = {"ドジャース":{w:0,l:0},"ジャイアンツ":{w:0,l:0},"パドレス":{w:0,l:0},"Dバックス":{w:0,l:0},"ロッキーズ":{w:0,l:0}};
   const logRows = [];
 
   rows.forEach(r=>{
     const date = r.date || r.Date || r.DATE;
-    const opp  = r.opponent || r.Opponent || r.OPP;
+    const oppRaw  = r.opponent || r.Opponent || r.OPP;
+    const opp = normTeam(oppRaw);
     const ds   = Number(r.dodgers_runs || r.Dodgers || r.ds || 0);
     const os   = Number(r.opp_runs || r.Opp || r.os || 0);
     const res  = r.result || (ds>os?"W":(ds<os?"L":"T"));
@@ -133,45 +217,122 @@ function computeFromRows(rows){
     const rr = Number(r.R||r.r||0);
     const bb = Number(r.BB||r.bb||0);
     let tb   = Number(r.TB||r.tb||0);
-    const kcal = Math.round(Number(r.kcal_total||r.kcal||0));
-    const carb = Number(r.carb_total||r.carb||0);
-    const prot = Number(r.prot_total||r.prot||0);
-    const fat  = Number(r.fat_total ||r.fat ||0);
+    const kcal = r.kcal_total ?? r.kcal ?? "-";
+    const carb = r.carb_total ?? r.carb ?? "-";
+    const prot = r.prot_total ?? r.prot ?? "-";
+    const fat  = r.fat_total  ?? r.fat  ?? "-";
     const comment = r.comment || "";
 
     if(!tb || tb===0){ tb = h + 3*hr; }
 
-    G += 1; AB += ab; H += h; HR += hr; RBI += rbi; R += rr; BB += bb; TB += tb;
-    lastK = kcal; lastC = carb; lastP = prot; lastF = fat;
+    G+=1; AB+=ab; H+=h; HR+=hr; RBI+=rbi; R+=rr; BB+=bb; TB+=tb;
+    lastK=kcal; lastC=carb; lastP=prot; lastF=fat;
 
+    // standings: LAD vs Opponent
     if(res==="W"){ standings["ドジャース"].w++; if(standings[opp]) standings[opp].l++; }
     else if(res==="L"){ standings["ドジャース"].l++; if(standings[opp]) standings[opp].w++; }
+    // 引き分け(T)は加算しない想定
 
-    logRows.push({date, opp, ds, os, res, ab, h, hr, rbi, rr, bb, kcal, carb, prot, fat, comment});
+    logRows.push({date, opp:opp||oppRaw, ds, os, res, ab, h, hr, rbi, rr, bb, kcal, carb, prot, fat, comment});
   });
 
   const AVG = AB>0 ? (H/AB).toFixed(3) : ".000";
   const OBP = (AB+BB)>0 ? ((H+BB)/(AB+BB)).toFixed(3) : ".000";
   const SLG = AB>0 ? (TB/AB).toFixed(3) : ".000";
   const OPS = (parseFloat(OBP)+parseFloat(SLG)).toFixed(3);
-  return { totals:{G,AB,H,HR,RBI,R,BB,TB,AVG,OBP,SLG,OPS, lastK,lastC,lastP,lastF}, standings, logRows };
+
+  return {totals:{G,AB,H,HR,RBI,R,BB,TB,AVG,OBP,SLG,OPS,lastK,lastC,lastP,lastF}, standings, logRows};
 }
 
+// ===== タイトル争い（演出） =====
+function titleRanks(t){
+  const youAVG = parseFloat(t.AVG);
+  const youHR  = t.HR;
+  const youRBI = t.RBI;
+  const youR   = t.R;
+  const avgLeaders = [{n:"ルイス・アラエス",v:0.340},{n:"ムーキー・ベッツ",v:0.330},{n:"フレディ・フリーマン",v:0.325},{n:"ホセ・アルトゥーベ",v:0.320}];
+  const hrLeaders  = [{n:"アーロン・ジャッジ",v:45},{n:"大谷翔平",v:42},{n:"カイル・シュワーバー",v:40},{n:"マット・オルソン",v:38}];
+  const rbiLeaders = [{n:"ラファエル・デバース",v:120},{n:"フアン・ソト",v:115},{n:"ヨルダン・アルバレス",v:110},{n:"ブライス・ハーパー",v:105}];
+  const rLeaders   = [{n:"ロナルド・アクーニャJr.",v:120},{n:"コリー・シーガー",v:115},{n:"ムーキー・ベッツ",v:110},{n:"フアン・ソト",v:105}];
+
+  function rank(pool, yourVal, isRate=false){
+    const arr = pool.map(x=>x.v).concat([yourVal]).sort((a,b)=>b-a);
+    const pos = arr.indexOf(yourVal)+1;
+    const top = pool[0];
+    return {pos, topName:top.n, topVal: isRate? top.v.toFixed(3) : top.v, you: isRate? (isNaN(yourVal)? ".000" : yourVal.toFixed(3)) : yourVal};
+  }
+
+  const rAvg = rank(avgLeaders, isNaN(youAVG)?0:youAVG, true);
+  const rHr  = rank(hrLeaders, youHR, false);
+  const rRbi = rank(rbiLeaders, youRBI, false);
+  const rR   = rank(rLeaders, youR, false);
+
+  document.getElementById("rankAVGPos").textContent = `${rAvg.pos}位`;
+  document.getElementById("rankAVGName").textContent = avgLeaders[0].n;
+  document.getElementById("rankAVGTop").textContent = rAvg.topVal;
+  document.getElementById("rankAVGYou").textContent = rAvg.you;
+
+  document.getElementById("rankHRPos").textContent = `${rHr.pos}位`;
+  document.getElementById("rankHRName").textContent = hrLeaders[0].n;
+  document.getElementById("rankHRTop").textContent = rHr.topVal;
+  document.getElementById("rankHRYou").textContent = rHr.you;
+
+  document.getElementById("rankRBIPos").textContent = `${rRbi.pos}位`;
+  document.getElementById("rankRBIName").textContent = rbiLeaders[0].n;
+  document.getElementById("rankRBITop").textContent = rRbi.topVal;
+  document.getElementById("rankRBIYou").textContent = rRbi.you;
+
+  document.getElementById("rankRPos").textContent = `${rR.pos}位`;
+  document.getElementById("rankRName").textContent = rLeaders[0].n;
+  document.getElementById("rankRTop").textContent = rR.topVal;
+  document.getElementById("rankRYou").textContent = rR.you;
+}
+
+// ===== ターゲット設定（localStorage） =====
+const LS_KEY_TARGETS = "dodgers_targets_v1";
+function loadTargets(){
+  try{ return JSON.parse(localStorage.getItem(LS_KEY_TARGETS)) || {calLow:1900,calHigh:2100,carbLow:150,carbHigh:200,prot:120,fatLow:50,fatHigh:60}; }
+  catch(e){ return {calLow:1900,calHigh:2100,carbLow:150,carbHigh:200,prot:120,fatLow:50,fatHigh:60}; }
+}
+function saveTargets(t){ localStorage.setItem(LS_KEY_TARGETS, JSON.stringify(t)); }
+function judgeDay(tot,tgt){
+  const kcal=parseFloat(tot.lastK)||0, carb=parseFloat(tot.lastC)||0, prot=parseFloat(tot.lastP)||0, fat=parseFloat(tot.lastF)||0;
+  if(!kcal && !carb && !prot && !fat){ document.getElementById("judge").textContent="最新日の栄養が未入力です。"; return; }
+  const msgs=[];
+  msgs.push( (kcal<tgt.calLow) ? `エネルギー不足（${kcal} < ${tgt.calLow}kcal）`
+          : (kcal>tgt.calHigh) ? `エネルギー過多（${kcal} > ${tgt.calHigh}kcal）`
+          : `エネルギーOK（${kcal}kcal）`);
+  msgs.push( (carb<tgt.carbLow) ? `糖質少なめ（${carb} < ${tgt.carbLow}g）`
+          : (carb>tgt.carbHigh) ? `糖質多め（${carb} > ${tgt.carbHigh}g）`
+          : `糖質OK（${carb}g）`);
+  msgs.push( (prot<tgt.prot) ? `P不足（${prot} < ${tgt.prot}g）` : `P OK（${prot}g）`);
+  msgs.push( (fat<tgt.fatLow) ? `脂質少なめ（${fat} < ${tgt.fatLow}g）`
+          : (fat>tgt.fatHigh) ? `脂質多め（${fat} > ${tgt.fatHigh}g）`
+          : `脂質OK（${fat}g）`);
+  document.getElementById("judge").innerHTML = msgs.map(m=>`<div>${m}</div>`).join("");
+}
+
+// ===== NEXT GAME（localStorage） =====
+const LS_KEY_NEXT = "dodgers_next_game_note";
+function loadNext(){ return localStorage.getItem(LS_KEY_NEXT) || ""; }
+function saveNext(v){ localStorage.setItem(LS_KEY_NEXT, v); }
+
+// ===== レンダリング =====
 function render(totals, standings, logRows){
   ["G","AB","H","HR","RBI","R","BB","TB","AVG","OBP","SLG","OPS"].forEach(id=>{
     document.getElementById(id).textContent = totals[id] ?? "-";
   });
-  document.getElementById("KCAL").textContent = totals.lastK? `${totals.lastK} kcal` : "-";
-  document.getElementById("CARB").textContent = totals.lastC? `${totals.lastC} g` : "-";
-  document.getElementById("PROT").textContent = totals.lastP? `${totals.lastP} g` : "-";
-  document.getElementById("FAT").textContent  = totals.lastF? `${totals.lastF} g` : "-";
+  document.getElementById("KCAL").textContent = totals.lastK ? `${totals.lastK}` : "-";
+  document.getElementById("CARB").textContent = totals.lastC ? `${totals.lastC}` : "-";
+  document.getElementById("PROT").textContent = totals.lastP ? `${totals.lastP}` : "-";
+  document.getElementById("FAT").textContent  = totals.lastF ? `${totals.lastF}` : "-";
 
+  // standings sort & render
   const teams = Object.keys(standings).map(n=>({name:n, ...standings[n]}));
   teams.sort((a,b)=>{
-    const pa = a.w/(a.w+a.l||1);
-    const pb = b.w/(b.w+b.l||1);
+    const pa = a.w/(a.w+a.l||1), pb = b.w/(b.w+b.l||1);
     if(pb!==pa) return pb-pa;
-    return a.l - b.l;
+    return (b.w - a.w) || (a.l - b.l);
   });
   const leader = teams[0];
   const tbody = document.querySelector("#nlw tbody"); tbody.innerHTML="";
@@ -182,6 +343,7 @@ function render(totals, standings, logRows){
     tbody.appendChild(tr);
   });
 
+  // game log
   const logBody = document.querySelector("#gameLog tbody"); logBody.innerHTML="";
   logRows.slice().reverse().forEach(g=>{
     const tr = document.createElement("tr");
@@ -191,21 +353,71 @@ function render(totals, standings, logRows){
       <td>${g.comment||""}</td>`;
     logBody.appendChild(tr);
   });
+
+  // title ranks
+  titleRanks(totals);
+
+  // judge against targets
+  judgeDay(totals, loadTargets());
 }
 
+// ===== 初期化 =====
 async function refresh(){
-  try{
-    const {rows} = await fetchSheet();
-    const {totals, standings, logRows} = computeFromRows(rows);
-    render(totals, standings, logRows);
-  }catch(e){
-    console.error("Sheet fetch/render error:", e);
-    alert("シートの読み込みに失敗：公開設定 / SHEET_ID / シート名(games) をご確認ください。");
-  }
+  const rows = await fetchSheet();
+  const {totals, standings, logRows} = compute(rows);
+  render(totals, standings, logRows);
 }
+function init(){
+  // targets
+  document.getElementById("saveTargets").addEventListener("click", ()=>{
+    const t = {
+      calLow: Number(document.getElementById("tCalLow").value||0),
+      calHigh:Number(document.getElementById("tCalHigh").value||0),
+      carbLow:Number(document.getElementById("tCarbLow").value||0),
+      carbHigh:Number(document.getElementById("tCarbHigh").value||0),
+      prot:   Number(document.getElementById("tProt").value||0),
+      fatLow: Number(document.getElementById("tFatLow").value||0),
+      fatHigh:Number(document.getElementById("tFatHigh").value||0),
+    };
+    localStorage.setItem("dodgers_targets_v1", JSON.stringify(t));
+    refresh();
+  });
+  document.getElementById("resetTargets").addEventListener("click", ()=>{
+    const def = {calLow:1900,calHigh:2100,carbLow:150,carbHigh:200,prot:120,fatLow:50,fatHigh:60};
+    localStorage.setItem("dodgers_targets_v1", JSON.stringify(def));
+    document.getElementById("tCalLow").value=def.calLow;
+    document.getElementById("tCalHigh").value=def.calHigh;
+    document.getElementById("tCarbLow").value=def.carbLow;
+    document.getElementById("tCarbHigh").value=def.carbHigh;
+    document.getElementById("tProt").value=def.prot;
+    document.getElementById("tFatLow").value=def.fatLow;
+    document.getElementById("tFatHigh").value=def.fatHigh;
+    refresh();
+  });
 
-refresh();
-setInterval(refresh, REFRESH_SEC*1000);
+  // next game
+  const ng = (localStorage.getItem("dodgers_next_game_note") || "");
+  document.getElementById("nextGame").value = ng;
+  document.getElementById("saveNext").addEventListener("click", ()=>{
+    localStorage.setItem("dodgers_next_game_note", document.getElementById("nextGame").value || "");
+  });
+
+  // load targets into inputs
+  try{
+    const t = JSON.parse(localStorage.getItem("dodgers_targets_v1")) || {calLow:1900,calHigh:2100,carbLow:150,carbHigh:200,prot:120,fatLow:50,fatHigh:60};
+    document.getElementById("tCalLow").value=t.calLow;
+    document.getElementById("tCalHigh").value=t.calHigh;
+    document.getElementById("tCarbLow").value=t.carbLow;
+    document.getElementById("tCarbHigh").value=t.carbHigh;
+    document.getElementById("tProt").value=t.prot;
+    document.getElementById("tFatLow").value=t.fatLow;
+    document.getElementById("tFatHigh").value=t.fatHigh;
+  }catch(e){}
+
+  refresh();
+  setInterval(refresh, REFRESH_SEC*1000);
+}
+document.addEventListener("DOMContentLoaded", init);
 </script>
 </body>
 </html>
