@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ドジャース減量シーズン・ダッシュボード（完全統合版）</title>
+<title>ドジャース減量シーズン・ダッシュボード（完全統合＋食事明細）</title>
 <style>
   :root{
     --ink:#111827; --muted:#6b7280; --border:#e5e7eb; --bg:#f9fafb; --card:#ffffff; --brand:#1f2937;
@@ -47,8 +47,8 @@
 <body>
   <div class="wrap">
     <header>
-      <h1>ドジャース減量シーズン・ダッシュボード（完全統合版）</h1>
-      <div class="muted">Googleシート <code>games</code> を読み込み：打撃・栄養・試合結果／<b>NL西スタンディング（実力重みシミュレーション）</b>／<b>タイトル争い</b>／<b>ターゲット評価</b>／<b>NEXT GAME</b> を表示。</div>
+      <h1>ドジャース減量シーズン・ダッシュボード（完全統合＋食事明細）</h1>
+      <div class="muted">Googleシート <code>games</code> を読み込み：打撃・栄養・試合結果／NL西スタンディング（実力重みシミュレーション）／タイトル争い／ターゲット評価／NEXT GAME／<b>食事明細</b> を表示。</div>
     </header>
 
     <section class="grid">
@@ -83,11 +83,19 @@
         <div id="judge" class="small" style="margin-top:8px;color:#6b7280">ターゲット設定に基づき、最新日の評価を表示します。</div>
       </div>
 
-      <div class="card span-8">
-        <h2>試合ログ</h2>
+      <div class="card span-12">
+        <h2>試合ログ（食事明細つき）</h2>
         <div class="scroll">
           <table id="gameLog">
-            <thead><tr><th>日付</th><th>対戦相手</th><th>スコア</th><th>結果</th><th>成績（AB-H HR RBI R BB）</th><th>栄養(kcal/C/P/F)</th><th>コメント</th></tr></thead>
+            <thead>
+              <tr>
+                <th>日付</th><th>対戦相手</th><th>スコア</th><th>結果</th>
+                <th>成績（AB-H HR RBI R BB）</th>
+                <th>栄養(kcal/C/P/F)</th>
+                <th>朝食</th><th>昼食</th><th>夕食</th><th>間食</th><th>飲酒</th>
+                <th>コメント</th>
+              </tr>
+            </thead>
             <tbody></tbody>
           </table>
         </div>
@@ -101,11 +109,11 @@
             <tbody></tbody>
           </table>
         </div>
-        <div class="small muted">同日の非LAD試合は、各球団の過去3年勝率（重み）で確率決定（決定論的乱数）。</div>
+        <div class="small muted">非LAD試合は、各球団の過去3年勝率（重み）で確率決定（決定論的乱数）。</div>
         <div class="small" style="margin-top:6px"><label><input id="simToggle" type="checkbox" checked> シミュレーションを有効にする</label></div>
       </div>
 
-      <div class="card span-6">
+      <div class="card span-4">
         <h2>MLB タイトル争い（スター比較・演出）</h2>
         <div class="scroll">
           <table>
@@ -118,10 +126,9 @@
             </tbody>
           </table>
         </div>
-        <div class="small muted">※ 演出用のスター成績（固定）。あなたの通算成績と比較し順位を表示。</div>
       </div>
 
-      <div class="card span-6">
+      <div class="card span-4">
         <h2>ターゲット設定（1日）</h2>
         <div class="kvs">
           <div class="kv">kcal <input id="tCalLow" type="number" value="1900" style="width:90px">〜<input id="tCalHigh" type="number" value="2100" style="width:90px"></div>
@@ -213,11 +220,18 @@ function compute(rows, enableSim){
     const rbi=Number(r.RBI||r.rbi||0); const rr=Number(r.R||r.r||0); const bb=Number(r.BB||r.bb||0);
     let tb=Number(r.TB||r.tb||0); const kcal=r.kcal_total??r.kcal??'-'; const carb=r.carb_total??r.carb??'-';
     const prot=r.prot_total??r.prot??'-'; const fat=r.fat_total??r.fat??'-'; const comment=r.comment||'';
+    // 追加：食事明細
+    const breakfast=r.breakfast || r.BREAKFAST || r.Breakfast || "";
+    const lunch=r.lunch || r.LUNCH || r.Lunch || "";
+    const dinner=r.dinner || r.DINNER || r.Dinner || "";
+    const snack=r.snack || r.SNACK || r.Snack || "";
+    const drink=r.drink || r.DRINK || r.Drink || "";
+
     if(!tb||tb===0){tb=h+3*hr;}
     G+=1; AB+=ab; H+=h; HR+=hr; RBI+=rbi; R+=rr; BB+=bb; TB+=tb; lastK=kcal; lastC=carb; lastP=prot; lastF=fat;
     if(res==='W'){standings['ドジャース'].w++; if(standings[opp]) standings[opp].l++;}
     else if(res==='L'){standings['ドジャース'].l++; if(standings[opp]) standings[opp].w++;}
-    logRows.push({date,opp,ds,os,res,ab,h,hr,rbi,rr,bb,kcal,carb,prot,fat,comment});
+    logRows.push({date,opp,ds,os,res,ab,h,hr,rbi,rr,bb,kcal,carb,prot,fat,comment,breakfast,lunch,dinner,snack,drink});
     if(date) datesSet.add(String(date));
   });
 
@@ -332,7 +346,6 @@ function judgeDay(tot,tgt){
 
   document.getElementById("judge").innerHTML = msgs.map(m=>`<div>${m}</div>`).join("");
 
-  // バッジ
   if(bad===0 && good>=3){ badge.textContent="◎ 達成"; badge.style.display="inline-block"; }
   else if(good>=2){ badge.textContent="△ もう一歩"; badge.style.display="inline-block"; }
   else{ badge.textContent="× 要調整"; badge.style.display="inline-block"; }
@@ -371,6 +384,7 @@ function render(totals, standings, logRows){
     tr.innerHTML = `<td>${g.date||""}</td><td>${g.opp||""}</td><td>${g.ds}-${g.os}</td><td>${g.res}</td>
       <td>${g.ab}-${g.h} HR${g.hr} RBI${g.rbi} R${g.rr} BB${g.bb}</td>
       <td>${g.kcal||0}/${g.carb||0}/${g.prot||0}/${g.fat||0}</td>
+      <td>${g.breakfast||""}</td><td>${g.lunch||""}</td><td>${g.dinner||""}</td><td>${g.snack||""}</td><td>${g.drink||""}</td>
       <td>${g.comment||""}</td>`;
     logBody.appendChild(tr);
   });
