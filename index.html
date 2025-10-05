@@ -92,7 +92,7 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="text-xs text-slate-500 mt-2">※ スターの成績は2025年想定値ベースで「試合数に応じて」進行。ジャッジHRはシーズン55〜58本に収束するよう調整。</p>
+      <p class="text-xs text-slate-500 mt-2">※ スターの成績は想定進行。ジャッジHRはシーズン55〜58本に収束するよう調整。</p>
     </section>
 
     <!-- ターゲット設定（1日） -->
@@ -139,18 +139,20 @@
   <!-- ===== 設定 ===== -->
   <script>
     const CONFIG = {
-      SHEET_ID: "1b3oO6nDY1d-jmP2cFchm7ld5PvKIr34vh0KXYYKxx8I", // games シートをウェブに公開 (CSV)
+      SHEET_ID: "<YOUR_GOOGLE_SHEET_ID>", // games シートをウェブに公開 (CSV)
       SHEET_NAME: "games",
       TIMEZONE: "Asia/Tokyo",
     };
-    const NLW = ["LAD","SFG","SDP","ARI","COL"];
+    const NLW = ["LAD","SFG","SDP","ARI","COL"]; // 5チーム固定
     const AL_POOL = ["SEA","TEX","HOU","LAA","OAK"]; // 補完用
     const PCT_3Y = { LAD:0.615, SFG:0.515, SDP:0.520, ARI:0.505, COL:0.420, SEA:0.540, TEX:0.540, HOU:0.570, LAA:0.430, OAK:0.350 };
+
+    // タイトル争い（実名表記）
     const TITLE_PLAYERS = [
-      { key:'avg', title:'首位打者', top:[.325,.340] },
-      { key:'hr',  title:'本塁打王', top:[55,58] },
-      { key:'rbi', title:'打点王',   top:[120,135] },
-      { key:'r',   title:'得点王',   top:[120,135] },
+      { key:'avg', title:'首位打者', player:'Luis Arráez', team:'MIA', top:[.325,.340] },
+      { key:'hr',  title:'本塁打王', player:'Aaron Judge', team:'NYY', top:[55,58] },
+      { key:'rbi', title:'打点王',   player:'Yordan Alvarez', team:'HOU', top:[120,135] },
+      { key:'r',   title:'得点王',   player:'Mookie Betts', team:'LAD', top:[120,135] },
     ];
   </script>
 
@@ -199,11 +201,29 @@
   }
 
   function findNext(schedule, todayISO){ return schedule.find(g=>g.date>=todayISO); }
-  function lastPlayed(rows){ return [...rows].reverse().find(r=>r.dodgers_runs||r.opp_runs); }
+  function lastPlayed(rows){ return [...rows].reverse().find(r=> (r.dodgers_runs||r.opp_runs) ); }
+
+  // ▼ games行のスコア欠損を決定論で補完（LADの対戦のみ）
+  function fillMissingScores(rows, schedule, todayISO){
+    for(const r of rows){
+      if(!r.date || r.date>todayISO) continue; // 未来は補完しない
+      if((r.dodgers_runs&&r.opp_runs&&r.result)) continue; // 既に埋まっている
+      const sch = schedule.find(g=>g.date===r.date);
+      const opp = r.opponent||sch?.opp||'SFG';
+      const home = sch?.home ?? true;
+      const res = home ? decideWin('LAD', opp, r.date) : decideWin(opp, 'LAD', r.date);
+      const ladR = home ? res.homeR : res.awayR;
+      const oppR = home ? res.awayR : res.homeR;
+      r.dodgers_runs = String(ladR);
+      r.opp_runs     = String(oppR);
+      r.result       = ladR>oppR? 'W':'L';
+      r._simulatedScore = true;
+    }
+  }
 
   function renderLatestAndNext(rows, schedule, todayISO){
     const last=lastPlayed(rows); const next=findNext(schedule, todayISO);
-    $('#latest-game').textContent = last? `${last.date} ${last.opponent} ${last.dodgers_runs}-${last.opp_runs} (${last.result||''})` : '-';
+    $('#latest-game').textContent = last? `${last.date} ${last.opponent} ${last.dodgers_runs}-${last.opp_runs} (${last.result||''}${last._simulatedScore?'・Sim':''})` : '-';
     $('#next-game').textContent   = next? `${next.date} vs ${next.opp} ${next.home?'(Home)':'(Away)'}` : '-';
   }
 
@@ -212,7 +232,7 @@
     for(const r of rows){
       const tr=document.createElement('tr');
       const score = (r.dodgers_runs||r.opp_runs)? `${r.dodgers_runs||0}-${r.opp_runs||0}` : '-';
-      const result = r.result|| ( (r.dodgers_runs||0)>(r.opp_runs||0)? 'W':'L' );
+      const result = r.result|| ( (+r.dodgers_runs||0)>(+r.opp_runs||0)? 'W':'L' );
       const bat = `${r.AB||0}-${r.H||0} ${r.HR||0} ${r.RBI||0} ${r.R||0} ${r.BB||0}`;
       const nut = `${r.kcal_total||0}/${r.carb_total||0}/${r.prot_total||0}/${r.fat_total||0}`;
       const cells=[r.date,r.opponent,score,result,bat,nut,r.breakfast||'',r.lunch||'',r.dinner||'',r.snack||'',r.drink||'',r.comment||''];
@@ -239,46 +259,62 @@
   }
 
   function renderStandings(rows, schedule, todayISO, enableSim){
-    const teams = { LAD:{W:0,L:0} , SFG:{W:0,L:0}, SDP:{W:0,L:0}, ARI:{W:0,L:0}, COL:{W:0,L:0} };
-    // LAD 実績
+    const teams = { LAD:{W:0,L:0}, SDP:{W:0,L:0}, SFG:{W:0,L:0}, COL:{W:0,L:0}, ARI:{W:0,L:0} };
+    // LAD 実績（欠損はfillMissingScoresで補完済み想定）
     for(const r of rows){ if(!r.date||r.date>todayISO) continue; const w=(+r.dodgers_runs||0)>(+r.opp_runs||0); if(w) teams.LAD.W++; else teams.LAD.L++; }
+
     if(enableSim){
       const dates=[...new Set(schedule.filter(g=>g.date<=todayISO).map(g=>g.date))];
       for(const d of dates){
-        const today = schedule.find(g=>g.date===d); if(!today) continue; const ladOpp=today.opp;
-        const rest = NLW.filter(t=>t!=="LAD" && t!==ladOpp);
-        const [t1,t2,t3]=rest; const al=["SEA","TEX","HOU","LAA","OAK"]; const alOpp=al[hashStr(d)%al.length];
-        const pairs=[{home:t1,away:t2},{home:t3,away:alOpp}];
-        for(const m of pairs){ const res=decideWin(m.home,m.away,d); const winTeam=res.homeWins?m.home:m.away; const loseTeam=res.homeWins?m.away:m.home; teams[winTeam]??={W:0,L:0}; teams[loseTeam]??={W:0,L:0}; teams[winTeam].W++; teams[loseTeam].L++; }
+        const today = schedule.find(g=>g.date===d);
+        const ladOpp = today? today.opp : null;
+        const rest = NLW.filter(t=>t!=="LAD" && t!==ladOpp); // 残り3または4
+        if(!today){
+          // LAD休養日: 残り4チームを2カードに分割
+          const order=[...rest];
+          const pairs=[ {home:order[0],away:order[1]}, {home:order[2],away:order[3]} ];
+          for(const m of pairs){ const res=decideWin(m.home,m.away,d); const win=res.homeWins?m.home:m.away; const lose=res.homeWins?m.away:m.home; teams[win].W++; teams[lose].L++; }
+        }else{
+          // LAD試合日: 残り3チーム → 1カード + 余り1チームはAL_POOLと対戦
+          const order=[...rest];
+          if(order.length>=2){
+            const m1={home:order[0],away:order[1]};
+            const res1=decideWin(m1.home,m1.away,d); const win1=res1.homeWins?m1.home:m1.away; const lose1=res1.homeWins?m1.away:m1.home; teams[win1].W++; teams[lose1].L++;
+          }
+          if(order.length===3){
+            const al = AL_POOL[ hashStr(d)%AL_POOL.length ];
+            const m2={home:order[2],away:al};
+            const res2=decideWin(m2.home,m2.away,d); const win2=res2.homeWins?m2.home:m2.away; const lose2=res2.homeWins?m2.away:m2.home; teams[win2].W++; teams[lose2]?.L++; // ALは集計しない
+          }
+        }
       }
     }
-    const order=Object.entries(teams).map(([k,v])=>({team:k,...v,pct: (v.W+v.L? (v.W/(v.W+v.L)):0)})).sort((a,b)=>b.pct-a.pct);
-    const lead=order[0]?.W-order[0]?.L; // for GB baseline (approx)
+
+    const order=Object.entries(teams).map(([team,v])=>({team,...v,pct:(v.W+v.L? v.W/(v.W+v.L):0)})).sort((a,b)=>b.pct-a.pct);
     const tb=$('#standings-table tbody'); tb.innerHTML='';
     order.forEach((t,i)=>{
-      const gb = i===0? 0 : ((order[0].W - t.W) + (t.L - order[0].L))/2; // 近似
+      const gb=i===0?0:((order[0].W-t.W)+(t.L-order[0].L))/2;
       const tr=document.createElement('tr');
-      [i+1, t.team, t.W, t.L, t.pct.toFixed(3), gb.toFixed(1)].forEach(c=>{ const td=document.createElement('td'); td.className='px-3 py-2 border-b border-slate-200'; td.textContent=c; tr.appendChild(td);});
+      [i+1,t.team,t.W,t.L,t.pct.toFixed(3),gb.toFixed(1)].forEach(c=>{ const td=document.createElement('td'); td.className='px-3 py-2 border-b border-slate-200'; td.textContent=c; tr.appendChild(td);});
       tb.appendChild(tr);
     });
   }
 
-  function renderTitle(){
+  function renderTitle(todayISO){
+    const p = 0.5; // シーズン進捗の簡易（必要なら日付から正規化）
     const tb=$('#title-table tbody'); tb.innerHTML='';
-    TITLE_PLAYERS.forEach((t,i)=>{
-      const p = 0.5; // シーズン中間の仮進捗（簡易）。必要あれば schedule から実試合数で割る。
-      const top = Array.isArray(t.top)? (t.key==='avg'? (t.top[0]+(t.top[1]-t.top[0])*p).toFixed(3) : Math.round(t.top[0]+(t.top[1]-t.top[0])*p)) : t.top;
+    TITLE_PLAYERS.forEach(t=>{
+      const topVal = Array.isArray(t.top)
+        ? (t.key==='avg' ? (t.top[0]+(t.top[1]-t.top[0])*p).toFixed(3) : Math.round(t.top[0]+(t.top[1]-t.top[0])*p))
+        : t.top;
+      const your = t.key==='avg'? 'あなたAVG' : t.key==='hr'? 'あなたHR(累計)' : t.key==='rbi'? 'あなたRBI' : 'あなたR';
       const tr=document.createElement('tr');
-      const your = i===1? 'あなたHR(累計)' : i===0? 'あなたAVG' : i===2? 'あなたRBI' : 'あなたR';
-      [t.title, 1, 'スター', top, your].forEach(c=>{ const td=document.createElement('td'); td.className='px-3 py-2 border-b border-slate-200'; td.textContent=c; tr.appendChild(td);});
+      [t.title, 1, `${t.player} (${t.team})`, topVal, your].forEach(c=>{ const td=document.createElement('td'); td.className='px-3 py-2 border-b border-slate-200'; td.textContent=c; tr.appendChild(td);});
       tb.appendChild(tr);
     });
   }
 
-  function loadTargets(){
-    const get=(k,d)=> localStorage.getItem(k) ?? d;
-    $('#t-kcal').value=get('t-kcal',''); $('#t-carb').value=get('t-carb',''); $('#t-prot').value=get('t-prot',''); $('#t-fat').value=get('t-fat','');
-  }
+  function loadTargets(){ const get=(k,d)=> localStorage.getItem(k) ?? d; $('#t-kcal').value=get('t-kcal',''); $('#t-carb').value=get('t-carb',''); $('#t-prot').value=get('t-prot',''); $('#t-fat').value=get('t-fat',''); }
   function saveTargets(e){ e.preventDefault(); ['t-kcal','t-carb','t-prot','t-fat'].forEach(id=>localStorage.setItem(id,$('#'+id).value||'')); }
   function resetTargets(){ ['t-kcal','t-carb','t-prot','t-fat'].forEach(id=>localStorage.removeItem(id)); loadTargets(); }
 
@@ -289,11 +325,14 @@
       const [csv, schedule] = await Promise.all([ fetchCSV(), Promise.resolve(scheduleFromEmbed()) ]);
       const {rows} = parseCSV(csv);
       const todayISO = toISO(new Date());
+
+      fillMissingScores(rows, schedule, todayISO); // ★ 欠損スコア補完
+
       renderSum(rows);
       renderGameLog(rows);
       renderLatestAndNext(rows, schedule, todayISO);
       renderStandings(rows, schedule, todayISO, $('#sim-toggle').checked);
-      renderTitle();
+      renderTitle(todayISO);
       $('#status-pill').textContent='OK';
     }catch(e){ console.error(e); $('#status-pill').textContent='エラー'; }
   }
