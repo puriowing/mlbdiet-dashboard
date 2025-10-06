@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ドジャース減量シーズン・ダッシュボード修正版</title>
+  <title>ドジャース減量シーズン・ダッシュボード</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 text-slate-800">
   <div class="max-w-6xl mx-auto px-4 py-6">
-    <h1 class="text-2xl sm:text-3xl font-bold mb-4">ドジャース減量シーズン・ダッシュボード修正版</h1>
+    <h1 class="text-2xl sm:text-3xl font-bold mb-4">ドジャース減量シーズン・ダッシュボード</h1>
     <p class="text-sm text-slate-600 mb-6">Googleシート <code>games</code> を読み込み：打撃・栄養・試合結果／NL西スタンディング（実力重みシミュレーション）／タイトル争い（進行型）／ターゲット評価／NEXT GAME（自動）／食事明細 を表示。</p>
 
     <!-- 通算打撃成績 -->
@@ -183,12 +183,46 @@
     const url=`https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(CONFIG.SHEET_NAME)}`;
     const r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.text();
   }
+
+  /* ▼ ヘッダー正規化対応パーサ（BOM/空白/大文字小文字/ハイフン対応）
+     gamesヘッダー（正規）：
+     date,opponent,dodgers_runs,opp_runs,result,AB,H,HR,RBI,R,BB,TB,comment,kcal_total,carb_total,prot_total,fat_total,breakfast,lunch,dinner,snack,drink */
   function parseCSV(text){
-    const lines=text.split(/\r?\n/).filter(Boolean); if(!lines.length) return {header:[],rows:[]};
-    const header=lines[0].split(',').map(s=>s.replace(/^"|"$/g,''));
-    const rows=lines.slice(1).map(line=>{ const cols=splitCSV(line); const rec={}; header.forEach((h,i)=>rec[h]= (cols[i]??'').replace(/^"|"$/g,'')); return rec; });
-    return {header,rows};
+    const lines=text.split(/\r?\n/).filter(l=>l.length>0);
+    if(!lines.length) return {header:[],rows:[]};
+
+    const EXPECT = [
+      'date','opponent','dodgers_runs','opp_runs','result',
+      'AB','H','HR','RBI','R','BB','TB','comment',
+      'kcal_total','carb_total','prot_total','fat_total',
+      'breakfast','lunch','dinner','snack','drink'
+    ];
+
+    const norm = s => (s||'').replace(/^\uFEFF/,'').trim().toLowerCase().replace(/[\s\-]+/g,'_');
+    const rawHeader = lines[0].split(',').map(s=>s.replace(/^"|"$/g,''));
+    const headerNorm = rawHeader.map(h=>norm(h));
+
+    // 期待→実ヘッダーのインデックスを構築（AB/H..は大文字のまま保持）
+    const indexOfKey = (key)=>{
+      const n = norm(key);
+      let i = headerNorm.indexOf(n);
+      if(i>=0) return i;
+      const alt = headerNorm.indexOf(key.toLowerCase());
+      return alt;
+    };
+
+    const idx = {}; EXPECT.forEach(k=> idx[k]= indexOfKey(k));
+
+    const rows = lines.slice(1).map(line=>{
+      const cols = splitCSV(line).map(c=>c.replace(/^"|"$/g,''));
+      const rec = {};
+      EXPECT.forEach(k=>{ const i=idx[k]; rec[k] = i>=0 ? cols[i] : ''; });
+      return rec;
+    });
+
+    return { header: EXPECT, rows };
   }
+
   function splitCSV(line){ const out=[]; let cur=''; let q=false; for(let i=0;i<line.length;i++){ const ch=line[i]; if(ch==='"'){ if(q && line[i+1]==='"'){cur+='"'; i++;} else q=!q; } else if(ch===',' && !q){ out.push(cur); cur=''; } else { cur+=ch; } } out.push(cur); return out; }
 
   function scheduleFromEmbed(){
@@ -301,7 +335,7 @@
   }
 
   function renderTitle(todayISO){
-    const p = 0.5; // シーズン進捗の簡易（必要なら日付から正規化）
+    const p = 0.5; // シーズン進捗の簡易
     const tb=$('#title-table tbody'); tb.innerHTML='';
     TITLE_PLAYERS.forEach(t=>{
       const topVal = Array.isArray(t.top)
@@ -333,7 +367,7 @@
       renderLatestAndNext(rows, schedule, todayISO);
       renderStandings(rows, schedule, todayISO, $('#sim-toggle').checked);
       renderTitle(todayISO);
-      $('#status-pill').textContent='OK';
+      $('#status-pill').textContent=`OK（rows:${rows.length}）`;
     }catch(e){ console.error(e); $('#status-pill').textContent='エラー'; }
   }
 
