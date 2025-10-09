@@ -3,384 +3,375 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ドジャース減量シーズン・ダッシュボード</title>
+  <title>Diet MLB Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 text-slate-800">
-  <div class="max-w-6xl mx-auto px-4 py-6">
-    <h1 class="text-2xl sm:text-3xl font-bold mb-4">ドジャース減量シーズン・ダッシュボード</h1>
-    <p class="text-sm text-slate-600 mb-6">
-      Googleシート <code>games</code> を読み込み：打撃・栄養・試合結果／NL西スタンディング（実力重みシミュレーション）／タイトル争い（進行型）／ターゲット評価／NEXT GAME（自動）／食事明細 を表示。
-    </p>
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <header class="mb-6">
+      <h1 class="text-2xl sm:text-3xl font-bold">Diet MLB Dashboard</h1>
+      <p class="text-sm text-slate-600 mt-1">データ元：Googleシート <code>games</code>（Diet MLBスプレッドシート）</p>
+    </header>
 
-    <!-- 通算打撃成績 -->
+    <!-- 通算成績 ------------------------------->
     <section class="mb-8">
-      <h2 class="text-xl font-semibold mb-2">通算打撃成績</h2>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-        <div><div class="text-xs text-slate-500">試合</div><div id="sum-games" class="text-2xl font-semibold">-</div></div>
-        <div><div class="text-xs text-slate-500">AB</div><div id="sum-ab" class="text-2xl font-semibold">-</div></div>
-        <div><div class="text-xs text-slate-500">H</div><div id="sum-h" class="text-2xl font-semibold">-</div></div>
-        <div><div class="text-xs text-slate-500">HR</div><div id="sum-hr" class="text-2xl font-semibold">-</div></div>
-        <div><div class="text-xs text-slate-500">RBI</div><div id="sum-rbi" class="text-2xl font-semibold">-</div></div>
-        <div><div class="text-xs text-slate-500">R</div><div id="sum-r" class="text-2xl font-semibold">-</div></div>
-        <div><div class="text-xs text-slate-500">BB</div><div id="sum-bb" class="text-2xl font-semibold">-</div></div>
-        <div><div class="text-xs text-slate-500">TB</div><div id="sum-tb" class="text-2xl font-semibold">-</div></div>
+      <h2 class="text-xl font-semibold mb-3">これまでの通算成績</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-3 text-center">
+        <div><div class="text-xs text-slate-500">AB</div><div id="agg-ab" class="text-2xl font-semibold">-</div></div>
+        <div><div class="text-xs text-slate-500">H</div><div id="agg-h" class="text-2xl font-semibold">-</div></div>
+        <div><div class="text-xs text-slate-500">AVG</div><div id="agg-avg" class="text-2xl font-semibold">.000</div></div>
+        <div><div class="text-xs text-slate-500">HR</div><div id="agg-hr" class="text-2xl font-semibold">-</div></div>
+        <div><div class="text-xs text-slate-500">RBI</div><div id="agg-rbi" class="text-2xl font-semibold">-</div></div>
+        <div><div class="text-xs text-slate-500">R</div><div id="agg-r" class="text-2xl font-semibold">-</div></div>
+        <div><div class="text-xs text-slate-500">BB</div><div id="agg-bb" class="text-2xl font-semibold">-</div></div>
+        <div><div class="text-xs text-slate-500">SLG</div><div id="agg-slg" class="text-2xl font-semibold">.000</div></div>
+        <div><div class="text-xs text-slate-500">OPS</div><div id="agg-ops" class="text-2xl font-semibold">.000</div></div>
       </div>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center mt-3">
-        <div><div class="text-xs text-slate-500">AVG</div><div id="sum-avg" class="text-xl font-semibold">.000</div></div>
-        <div><div class="text-xs text-slate-500">OBP</div><div id="sum-obp" class="text-xl font-semibold">.000</div></div>
-        <div><div class="text-xs text-slate-500">SLG</div><div id="sum-slg" class="text-xl font-semibold">.000</div></div>
-        <div><div class="text-xs text-slate-500">OPS</div><div id="sum-ops" class="text-xl font-semibold">.000</div></div>
-      </div>
+      <p class="text-xs text-slate-500 mt-2">※ OBPは「(H+BB)/(AB+BB)」、SLGは「TB/AB」、OPS=OBP+SLG。</p>
     </section>
 
-    <!-- 栄養（直近日の合計） -->
-    <section class="mb-8">
-      <h2 class="text-xl font-semibold mb-2">栄養（直近日の合計）</h2>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-        <div><div class="text-xs text-slate-500">kcal</div><div id="nut-kcal" class="text-2xl font-semibold">-</div></div>
-        <div><div class="text-xs text-slate-500">糖質</div><div id="nut-carb" class="text-2xl font-semibold">-</div></div>
-        <div><div class="text-xs text-slate-500">P</div><div id="nut-prot" class="text-2xl font-semibold">-</div></div>
-        <div><div class="text-xs text-slate-500">F</div><div id="nut-fat" class="text-2xl font-semibold">-</div></div>
-      </div>
-      <p class="text-xs text-slate-500 mt-2">ターゲット設定に基づき、最新日の評価を表示します。</p>
-    </section>
-
-    <!-- 試合ログ（食事明細つき） -->
-    <section class="mb-8">
-      <h2 class="text-xl font-semibold mb-2">試合ログ（食事明細つき）</h2>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm" id="games-table">
-          <thead>
-            <tr class="bg-slate-100 text-slate-700">
-              <th class="px-3 py-2">日付</th><th class="px-3 py-2">対戦相手</th><th class="px-3 py-2">スコア</th><th class="px-3 py-2">結果</th>
-              <th class="px-3 py-2">成績（AB-H HR RBI R BB）</th><th class="px-3 py-2">栄養(kcal/C/P/F)</th>
-              <th class="px-3 py-2">朝食</th><th class="px-3 py-2">昼食</th><th class="px-3 py-2">夕食</th><th class="px-3 py-2">間食</th><th class="px-3 py-2">飲酒</th><th class="px-3 py-2">コメント</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- ナ・リーグ西地区（Standings：実力重み付き） -->
-    <section class="mb-8">
-      <h2 class="text-xl font-semibold mb-2">ナ・リーグ西地区（Standings：実力重み付き） <span class="text-xs border px-2 py-0.5 rounded text-slate-500">非LAD試合は決定論シミュ</span></h2>
-      <div class="flex items-center gap-2 mb-2">
-        <label class="inline-flex items-center gap-2 text-sm"><input id="sim-toggle" type="checkbox" class="scale-110" checked> シミュレーションを有効にする</label>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm" id="standings-table">
-          <thead>
-            <tr class="bg-slate-100 text-slate-700">
-              <th class="px-3 py-2">順位</th><th class="px-3 py-2">チーム</th><th class="px-3 py-2">勝</th><th class="px-3 py-2">敗</th><th class="px-3 py-2">勝率</th><th class="px-3 py-2">GB</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- MLB タイトル争い（スター比較・進行型） -->
-    <section class="mb-8">
-      <h2 class="text-xl font-semibold mb-2">MLB タイトル争い（スター比較・進行型）</h2>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm" id="title-table">
-          <thead>
-            <tr class="bg-slate-100 text-slate-700">
-              <th class="px-3 py-2">タイトル</th><th class="px-3 py-2">順位</th><th class="px-3 py-2">トップ選手</th><th class="px-3 py-2">トップ値</th><th class="px-3 py-2">あなた</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <p class="text-xs text-slate-500 mt-2">※ スターの成績は想定進行。ジャッジHRはシーズン55〜58本に収束するよう調整。</p>
-    </section>
-
-    <!-- ターゲット設定（1日） -->
-    <section class="mb-8">
-      <h2 class="text-xl font-semibold mb-2">ターゲット設定（1日）</h2>
-      <form id="target-form" class="grid grid-cols-2 sm:grid-cols-5 gap-3 max-w-3xl">
-        <label class="text-sm">kcal <input id="t-kcal" type="number" class="border rounded px-2 py-1 w-full" placeholder="〜"></label>
-        <label class="text-sm">糖質g <input id="t-carb" type="number" class="border rounded px-2 py-1 w-full" placeholder="〜"></label>
-        <label class="text-sm">P目標g <input id="t-prot" type="number" class="border rounded px-2 py-1 w-full" placeholder=""></label>
-        <label class="text-sm">脂質g <input id="t-fat" type="number" class="border rounded px-2 py-1 w-full" placeholder="〜"></label>
-        <div class="flex items-end gap-2">
-          <button id="btn-target-save" class="border rounded px-3 py-1.5">ターゲット保存</button>
-          <button id="btn-target-reset" type="button" class="border rounded px-3 py-1.5">初期値</button>
+    <!-- ランキング（打率・HR・打点） --------->
+    <section class="mb-10">
+      <h2 class="text-xl font-semibold mb-3">ランキング（打率 / HR / 打点）</h2>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="bg-white border rounded-xl p-4">
+          <h3 class="font-semibold mb-2">打率</h3>
+          <ol id="rank-avg" class="space-y-2 text-sm"></ol>
         </div>
-      </form>
-      <p class="text-xs text-slate-500 mt-2">設定はブラウザの localStorage に保存。</p>
-    </section>
-
-    <!-- 最新試合 & NEXT GAME（自動） -->
-    <section class="mb-8">
-      <h2 class="text-xl font-semibold mb-2">最新試合 &amp; NEXT GAME（自動）</h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div class="border rounded-xl p-4 bg-white"><div class="text-xs text-slate-500">最新試合</div><div id="latest-game" class="text-lg">-</div></div>
-        <div class="border rounded-xl p-4 bg-white"><div class="text-xs text-slate-500">NEXT GAME</div><div id="next-game" class="text-lg">-</div></div>
-      </div>
-      <p class="text-xs text-slate-500 mt-2">内蔵スケジュールは2024年の実カード準拠。必要に応じて下のJSONから編集できます。</p>
-    </section>
-
-    <!-- スケジュール編集（JSON） -->
-    <section class="mb-8">
-      <h2 class="text-xl font-semibold mb-2">スケジュール編集（JSON）</h2>
-      <details>
-        <summary class="cursor-pointer select-none inline-flex items-center gap-2 border rounded px-3 py-1.5">開く / 閉じる</summary>
-        <div class="mt-3">
-          <textarea id="schedule-json" class="w-full h-48 border rounded p-2 font-mono text-xs"></textarea>
-          <div class="mt-2"><button id="btn-apply-schedule" class="border rounded px-3 py-1.5">反映</button></div>
+        <div class="bg-white border rounded-xl p-4">
+          <h3 class="font-semibold mb-2">HR</h3>
+          <ol id="rank-hr" class="space-y-2 text-sm"></ol>
         </div>
-      </details>
+        <div class="bg-white border rounded-xl p-4">
+          <h3 class="font-semibold mb-2">打点</h3>
+          <ol id="rank-rbi" class="space-y-2 text-sm"></ol>
+        </div>
+      </div>
+      <p class="text-xs text-slate-500 mt-2">※ ランキングは「あなた」＋主要スター（想定進行値）で比較表示します。</p>
     </section>
 
-    <div class="mt-8 text-xs text-slate-500">SHEET: <span id="sheet-pill">(未設定)</span> / 状態: <span id="status-pill">読み込み中...</span></div>
+    <!-- ア・リーグ西地区 順位表 ------------->
+    <section class="mb-10">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-xl font-semibold">ア・リーグ西地区の順位表</h2>
+        <label class="text-sm inline-flex items-center gap-2">
+          <input id="alw-sim-toggle" type="checkbox" class="scale-110" checked />
+          シミュレーション有効（期間：データ開始日〜今日）
+        </label>
+      </div>
+      <div class="overflow-x-auto bg-white border rounded-xl">
+        <table class="w-full text-sm" id="alw-table">
+          <thead>
+            <tr class="bg-slate-100 text-slate-700">
+              <th class="px-3 py-2 text-left">順位</th>
+              <th class="px-3 py-2 text-left">チーム</th>
+              <th class="px-3 py-2">勝</th>
+              <th class="px-3 py-2">敗</th>
+              <th class="px-3 py-2">勝率</th>
+              <th class="px-3 py-2">GB</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="text-xs text-slate-500 mt-2">※ 実試合成績は取得していないため、チーム実力値を元に日別決定論で集計（HOU/TEX/SEA/LAA/OAK）。</p>
+    </section>
+
+    <!-- 食事・運動ログ ------------------------>
+    <section class="mb-10">
+      <h2 class="text-xl font-semibold mb-3">これまでの食事・運動ログ</h2>
+      <div class="overflow-x-auto bg-white border rounded-xl">
+        <table class="w-full text-sm" id="log-table">
+          <thead>
+            <tr class="bg-slate-100 text-slate-700">
+              <th class="px-3 py-2">日付</th>
+              <th class="px-3 py-2">対戦相手</th>
+              <th class="px-3 py-2">成績（AB-H HR RBI R BB）</th>
+              <th class="px-3 py-2">栄養 (kcal/C/P/F)</th>
+              <th class="px-3 py-2">朝食</th>
+              <th class="px-3 py-2">昼食</th>
+              <th class="px-3 py-2">夕食</th>
+              <th class="px-3 py-2">間食</th>
+              <th class="px-3 py-2">飲酒</th>
+              <th class="px-3 py-2">運動</th>
+              <th class="px-3 py-2">メモ</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="text-xs text-slate-500 mt-2">※ 「運動」はコメント欄から簡易抽出（例：<code>バイク1時間</code>、<code>20秒×10</code>など）。</p>
+    </section>
+
+    <!-- フッター状態 ------------------------->
+    <footer class="text-xs text-slate-500">
+      SHEET: <span id="sheet-pill">未設定</span> ／ 状態: <span id="status-pill">読み込み中…</span>
+    </footer>
   </div>
 
-  <!-- ===== 設定 ===== -->
   <script>
+    // ===== 基本設定 =====
     const CONFIG = {
-      SHEET_ID: "<1b3oO6nDY1d-jmP2cFchm7ld5PvKIr34vh0KXYYKxx8I>", // games シートをウェブに公開 (CSV)
+      SHEET_ID: "1b3oO6nDY1d-jmP2cFchm7ld5PvKIr34vh0KXYYKxx8I",
       SHEET_NAME: "games",
       TIMEZONE: "Asia/Tokyo",
     };
-    const NLW = ["LAD","SFG","SDP","ARI","COL"]; // 5チーム固定
-    const AL_POOL = ["SEA","TEX","HOU","LAA","OAK"]; // 補完用
-    const PCT_3Y = { LAD:0.615, SFG:0.515, SDP:0.520, ARI:0.505, COL:0.420, SEA:0.540, TEX:0.540, HOU:0.570, LAA:0.430, OAK:0.350 };
+    const $ = (q)=>document.querySelector(q);
 
-    // タイトル争い（実名表記）
-    const TITLE_PLAYERS = [
-      { key:'avg', title:'首位打者', player:'Luis Arráez', team:'MIA', top:[.325,.340] },
-      { key:'hr',  title:'本塁打王', player:'Aaron Judge', team:'NYY', top:[55,58] },
-      { key:'rbi', title:'打点王',   player:'Yordan Alvarez', team:'HOU', top:[120,135] },
-      { key:'r',   title:'得点王',   player:'Mookie Betts', team:'LAD', top:[120,135] },
-    ];
-  </script>
+    // ===== CSV取得 =====
+    async function fetchCSV(){
+      const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(CONFIG.SHEET_NAME)}`;
+      const r = await fetch(url, {cache:"no-store"});
+      if(!r.ok) throw new Error(`CSV HTTP ${r.status}`);
+      return r.text();
+    }
 
-  <!-- ===== 2024実カード（最小サンプル：開幕〜SFG3戦） ===== -->
-  <script id="schedule-embed" type="application/json">{
-    "series": [
-      {"id":"STL-20240328-31","dates":["2024-03-28","2024-03-29","2024-03-30","2024-03-31"],"opp":"STL","home":true},
-      {"id":"SFG-20240401-03","dates":["2024-04-01","2024-04-02","2024-04-03"],"opp":"SFG","home":true}
-    ]
-  }</script>
+    // ===== CSVパース（ヘッダー正規化） =====
+    function splitCSV(line){ const out=[]; let cur='',q=false; for(let i=0;i<line.length;i++){ const ch=line[i]; if(ch==='"'){ if(q && line[i+1]==='"'){ cur+='"'; i++; } else q=!q; } else if(ch===',' && !q){ out.push(cur); cur=''; } else { cur+=ch; } } out.push(cur); return out; }
+    function parseCSV(text){
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      if(!lines.length) return {header:[], rows:[]};
+      const norm = s => (s||"").replace(/^\uFEFF/,'').trim().toLowerCase().replace(/[\s\-]+/g,'_');
+      const MAP = {
+        date:'date', opponent:'opponent', dodgers_runs:'dodgers_runs',
+        opp_runs:'opp_runs', op_runs:'opp_runs', opponent_runs:'opp_runs',
+        result:'result',
+        ab:'AB', h:'H', hr:'HR', rbi:'RBI', r:'R', bb:'BB', tb:'TB',
+        comment:'comment',
+        kcal_total:'kcal_total', calories_total:'kcal_total',
+        carb_total:'carb_total', carbohydrates_total:'carb_total',
+        prot_total:'prot_total', protein_total:'prot_total',
+        fat_total:'fat_total',
+        breakfast:'breakfast', lunch:'lunch', dinner:'dinner', snack:'snack', drink:'drink'
+      };
+      const EXPECT = ['date','opponent','dodgers_runs','opp_runs','result','AB','H','HR','RBI','R','BB','TB','comment','kcal_total','carb_total','prot_total','fat_total','breakfast','lunch','dinner','snack','drink'];
 
-  <!-- ===== ロジック ===== -->
-  <script>
-  const $ = (q)=>document.querySelector(q);
-  const toISO = (d)=>{ const z = new Date(d.toLocaleString('en-US',{timeZone:CONFIG.TIMEZONE})); return z.toISOString().slice(0,10) };
-  const hashStr=(s)=>{ let h=2166136261>>>0; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0 } return h; };
+      const rawHeader = splitCSV(lines[0]).map(s=>s.replace(/^"|"$/g,''));
+      const headerMap = rawHeader.map(h => MAP[norm(h)] || h);
 
-  function decideWin(homeTeam, awayTeam, dateISO){
-    const pHome=(PCT_3Y[homeTeam]??.5)+.015, pAway=(PCT_3Y[awayTeam]??.5)-.015;
-    const u=(hashStr(`${dateISO}:${homeTeam}-${awayTeam}`)%10000)/10000;
-    const homeWins = u < (pHome/(pHome+pAway));
-    const base=(hashStr(`${dateISO}:${awayTeam}-${homeTeam}`)%7);
-    const homeR=3+Math.floor(base/2)+(homeWins?1:0), awayR=3+(base%2)+(homeWins?0:1);
-    return {homeWins,homeR,awayR};
-  }
-
-  async function fetchCSV(){
-    const url=`https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(CONFIG.SHEET_NAME)}`;
-    const r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.text();
-  }
-
-  // ▼ ヘッダー正規化パーサ（BOM/空白/大小文字/ハイフン差異を吸収）
-  function parseCSV(text){
-    const lines = text.split(/\r?\n/).filter(Boolean);
-    if(!lines.length) return {header:[], rows:[]};
-
-    const EXPECT_KEYS = [
-      'date','opponent','dodgers_runs','opp_runs','result',
-      'AB','H','HR','RBI','R','BB','TB','comment',
-      'kcal_total','carb_total','prot_total','fat_total',
-      'breakfast','lunch','dinner','snack','drink'
-    ];
-
-    const norm = s => (s||'').replace(/^\uFEFF/, '').trim().toLowerCase().replace(/[\s\-]+/g,'_');
-    const MAP = {
-      date:'date', opponent:'opponent', dodgers_runs:'dodgers_runs',
-      opp_runs:'opp_runs', op_runs:'opp_runs', opponent_runs:'opp_runs',
-      result:'result',
-      ab:'AB', h:'H', hr:'HR', rbi:'RBI', r:'R', bb:'BB', tb:'TB',
-      comment:'comment',
-      kcal_total:'kcal_total', calories_total:'kcal_total',
-      carb_total:'carb_total', carbohydrates_total:'carb_total',
-      prot_total:'prot_total', protein_total:'prot_total',
-      fat_total:'fat_total',
-      breakfast:'breakfast', lunch:'lunch', dinner:'dinner',
-      snack:'snack', drink:'drink'
-    };
-
-    const headerRaw = splitCSV(lines[0]).map(s=>s.replace(/^"|"$/g,''));
-    const headerMap = headerRaw.map(h => MAP[norm(h)] || h);
-
-    const rows = lines.slice(1).map(line => {
-      const cols = splitCSV(line).map(c=>c.replace(/^"|"$/g,''));
-      const rec = Object.fromEntries(EXPECT_KEYS.map(k=>[k,'']));
-      headerMap.forEach((key, i) => {
-        if(!key) return;
-        if(!EXPECT_KEYS.includes(key)) return;
-        rec[key] = cols[i] ?? '';
+      const rows = lines.slice(1).map(line=>{
+        const cols = splitCSV(line).map(c=>c.replace(/^"|"$/g,''));
+        const rec = Object.fromEntries(EXPECT.map(k=>[k,'']));
+        headerMap.forEach((key,i)=>{ if(EXPECT.includes(key)) rec[key] = cols[i] ?? ''; });
+        return rec;
       });
-      return rec;
-    });
-
-    return {header: EXPECT_KEYS, rows};
-  }
-
-  function splitCSV(line){ const out=[]; let cur=''; let q=false; for(let i=0;i<line.length;i++){ const ch=line[i]; if(ch==='"'){ if(q && line[i+1]==='"'){cur+='"'; i++;} else q=!q; } else if(ch===',' && !q){ out.push(cur); cur=''; } else { cur+=ch; } } out.push(cur); return out; }
-
-  function scheduleFromEmbed(){
-    const json=$('#schedule-embed')?.textContent||'{}';
-    const data=JSON.parse(json);
-    const days=[];
-    for(const s of (data.series||[])) for(const d of s.dates) days.push({date:d, opp:s.opp, home:!!s.home, seriesId:s.id});
-    days.sort((a,b)=>a.date.localeCompare(b.date));
-    return days;
-  }
-
-  function findNext(schedule, todayISO){ return schedule.find(g=>g.date>=todayISO); }
-  function lastPlayed(rows){ return [...rows].reverse().find(r=> (r.dodgers_runs||r.opp_runs) ); }
-
-  // ▼ games行のスコア欠損を決定論で補完（LADの対戦のみ）
-  function fillMissingScores(rows, schedule, todayISO){
-    for(const r of rows){
-      if(!r.date || r.date>todayISO) continue;
-      if((r.dodgers_runs&&r.opp_runs&&r.result)) continue;
-      const sch = schedule.find(g=>g.date===r.date);
-      const opp = r.opponent||sch?.opp||'SFG';
-      const home = sch?.home ?? true;
-      const res = home ? decideWin('LAD', opp, r.date) : decideWin(opp, 'LAD', r.date);
-      const ladR = home ? res.homeR : res.awayR;
-      const oppR = home ? res.awayR : res.homeR;
-      r.dodgers_runs = String(ladR);
-      r.opp_runs     = String(oppR);
-      r.result       = ladR>oppR? 'W':'L';
-      r._simulatedScore = true;
+      return {header:EXPECT, rows};
     }
-  }
 
-  function renderLatestAndNext(rows, schedule, todayISO){
-    const last=lastPlayed(rows); const next=findNext(schedule, todayISO);
-    $('#latest-game').textContent = last? `${last.date} ${last.opponent} ${last.dodgers_runs}-${last.opp_runs} (${last.result||''}${last._simulatedScore?'・Sim':''})` : '-';
-    $('#next-game').textContent   = next? `${next.date} vs ${next.opp} ${next.home?'(Home)':'(Away)'}` : '-';
-  }
-
-  function renderGameLog(rows){
-    const tb=$('#games-table tbody'); tb.innerHTML='';
-    for(const r of rows){
-      const tr=document.createElement('tr');
-      const score = (r.dodgers_runs||r.opp_runs)? `${r.dodgers_runs||0}-${r.opp_runs||0}` : '-';
-      const result = r.result|| ( (+r.dodgers_runs||0)>(+r.opp_runs||0)? 'W':'L' );
-      const bat = `${r.AB||0}-${r.H||0} ${r.HR||0} ${r.RBI||0} ${r.R||0} ${r.BB||0}`;
-      const nut = `${r.kcal_total||0}/${r.carb_total||0}/${r.prot_total||0}/${r.fat_total||0}`;
-      const cells=[r.date,r.opponent,score,result,bat,nut,r.breakfast||'',r.lunch||'',r.dinner||'',r.snack||'',r.drink||'',r.comment||''];
-      for(const c of cells){ const td=document.createElement('td'); td.className='px-3 py-2 border-b border-slate-200'; td.textContent=c; tr.appendChild(td);} tb.appendChild(tr);
+    // ===== 集計・算出ユーティリティ =====
+    const toNum = v => (v===''||v==null) ? 0 : +v;
+    function calcAgg(rows){
+      const sum = k => rows.reduce((a,r)=>a+toNum(r[k]),0);
+      const AB=sum('AB'), H=sum('H'), HR=sum('HR'), RBI=sum('RBI'), R=sum('R'), BB=sum('BB'), TB=sum('TB');
+      const OBP = (AB+BB)? ((H+BB)/(AB+BB)) : 0;
+      const SLG = AB? (TB/AB) : 0;
+      const OPS = OBP+SLG;
+      return {AB,H,HR,RBI,R,BB,TB, AVG: AB? (H/AB):0, OBP, SLG, OPS};
     }
-  }
+    function fmt3(x){ return (x||0).toFixed(3); }
 
-  function renderSum(rows){
-    const nums=(k)=>rows.map(r=>+r[k]||0).reduce((a,b)=>a+b,0);
-    const g = rows.filter(r=>r.AB||r.H||r.HR||r.BB||r.TB).length;
-    const ab=nums('AB'), h=nums('H'), hr=nums('HR'), rbi=nums('RBI'), r=nums('R'), bb=nums('BB'), tb=nums('TB');
-    const avg = ab? (h/ab).toFixed(3) : '0.000';
-    const obp = (ab+bb)? ((h+bb)/(ab+bb)).toFixed(3) : '0.000';
-    const slg = ab? (tb/ab).toFixed(3) : '0.000';
-    const ops = (parseFloat(obp)+parseFloat(slg)).toFixed(3);
-    $('#sum-games').textContent=g; $('#sum-ab').textContent=ab; $('#sum-h').textContent=h; $('#sum-hr').textContent=hr; $('#sum-rbi').textContent=rbi; $('#sum-r').textContent=r; $('#sum-bb').textContent=bb; $('#sum-tb').textContent=tb; $('#sum-avg').textContent=avg; $('#sum-obp').textContent=obp; $('#sum-slg').textContent=slg; $('#sum-ops').textContent=ops;
-    const byDate=[...rows].sort((a,b)=>a.date.localeCompare(b.date));
-    const last = byDate[byDate.length-1];
-    $('#nut-kcal').textContent=last?.kcal_total||'-';
-    $('#nut-carb').textContent=last?.carb_total||'-';
-    $('#nut-prot').textContent=last?.prot_total||'-';
-    $('#nut-fat').textContent =last?.fat_total||'-';
-  }
+    // ===== ランキング（あなた＋スター想定） =====
+    // シーズン進捗p（あなたのデータ開始日〜今日の相対：最大1.0）
+    function seasonProgress(rows){
+      if(!rows.length) return 0;
+      const dates = rows.map(r=>r.date).filter(Boolean).sort();
+      const start = new Date(dates[0]+"T00:00:00");
+      const today = new Date(new Date().toLocaleString('en-US',{timeZone:CONFIG.TIMEZONE}));
+      const span = 180*24*3600*1000; // 便宜上180日をシーズン長とする
+      return Math.max(0, Math.min(1, (today - start)/span));
+    }
+    function starProjection(p){
+      // ざっくり想定（フルでの到達点）— 最終到達 × 進捗p
+      const stars = [
+        {name:"Aaron Judge", team:"NYY", HR:58, RBI:130, AVG:0.280},
+        {name:"Yordan Alvarez", team:"HOU", HR:45, RBI:125, AVG:0.295},
+        {name:"Corey Seager", team:"TEX", HR:35, RBI:105, AVG:0.300},
+        {name:"Julio Rodríguez", team:"SEA", HR:34, RBI:100, AVG:0.285},
+        {name:"Kyle Tucker", team:"HOU", HR:37, RBI:110, AVG:0.280},
+      ];
+      return stars.map(s=>({
+        name: s.name, team: s.team,
+        HR: Math.round(s.HR*p),
+        RBI: Math.round(s.RBI*p),
+        AVG: s.AVG // 打率はほぼ収束値とみなす
+      }));
+    }
+    function buildRanking(youAgg, stars){
+      const you = {name:"あなた", team:"", HR:youAgg.HR, RBI:youAgg.RBI, AVG:youAgg.AVG};
+      const pool = [you, ...stars];
 
-  function renderStandings(rows, schedule, todayISO, enableSim){
-    const teams = { LAD:{W:0,L:0}, SDP:{W:0,L:0}, SFG:{W:0,L:0}, COL:{W:0,L:0}, ARI:{W:0,L:0} };
-    for(const r of rows){ if(!r.date||r.date>todayISO) continue; const w=(+r.dodgers_runs||0)>(+r.opp_runs||0); if(w) teams.LAD.W++; else teams.LAD.L++; }
+      const rankAvg = [...pool].sort((a,b)=>b.AVG-a.AVG).map((p,i)=>({rank:i+1, name:p.name, team:p.team, val:fmt3(p.AVG)}));
+      const rankHR  = [...pool].sort((a,b)=>b.HR-a.HR).map((p,i)=>({rank:i+1, name:p.name, team:p.team, val:p.HR}));
+      const rankRBI = [...pool].sort((a,b)=>b.RBI-a.RBI).map((p,i)=>({rank:i+1, name:p.name, team:p.team, val:p.RBI}));
+      return {rankAvg, rankHR, rankRBI};
+    }
+    function renderRanking({rankAvg,rankHR,rankRBI}){
+      const paint = (list, el) => {
+        el.innerHTML = '';
+        list.slice(0,10).forEach(row=>{
+          const li = document.createElement('li');
+          const isYou = row.name === "あなた";
+          li.innerHTML = `<span class="inline-flex items-center gap-2">
+            <span class="w-6 text-right font-semibold">${row.rank}</span>
+            <span class="${isYou?'font-semibold text-blue-600':''}">${row.name}</span>
+            <span class="text-slate-400">${row.team||''}</span>
+          </span>
+          <span class="float-right ${isYou?'font-semibold text-blue-600':''}">${row.val}</span>`;
+          el.appendChild(li);
+        });
+      };
+      paint(rankAvg, document.getElementById('rank-avg'));
+      paint(rankHR , document.getElementById('rank-hr'));
+      paint(rankRBI, document.getElementById('rank-rbi'));
+    }
 
-    if(enableSim){
-      const dates=[...new Set(schedule.filter(g=>g.date<=todayISO).map(g=>g.date))];
-      for(const d of dates){
-        const today = schedule.find(g=>g.date===d);
-        const ladOpp = today? today.opp : null;
-        const rest = NLW.filter(t=>t!=="LAD" && t!==ladOpp);
-        if(!today){
-          const order=[...rest];
-          const pairs=[ {home:order[0],away:order[1]}, {home:order[2],away:order[3]} ];
-          for(const m of pairs){ const res=decideWin(m.home,m.away,d); const win=res.homeWins?m.home:m.away; const lose=res.homeWins?m.away:m.home; teams[win].W++; teams[lose].L++; }
-        }else{
-          const order=[...rest];
-          if(order.length>=2){
-            const m1={home:order[0],away:order[1]};
-            const res1=decideWin(m1.home,m1.away,d); const win1=res1.homeWins?m1.home:m1.away; const lose1=res1.homeWins?m1.away:m1.home; teams[win1].W++; teams[lose1].L++;
-          }
-          if(order.length===3){
-            const al = AL_POOL[ hashStr(d)%AL_POOL.length ];
-            const m2={home:order[2],away:al};
-            const res2=decideWin(m2.home,m2.away,d); const win2=res2.homeWins?m2.home:m2.away; const lose2=res2.homeWins?m2.away:m2.home; teams[win2].W++; teams[lose2]?.L++;
-          }
+    // ===== AL West 順位（決定論シミュ） =====
+    const ALW = ["HOU","TEX","SEA","LAA","OAK"];
+    const PCT = { HOU:0.570, TEX:0.540, SEA:0.540, LAA:0.430, OAK:0.350 };
+    const hashStr=(s)=>{ let h=2166136261>>>0; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0 } return h; };
+    function decideWin(home, away, dateISO){
+      const pHome=(PCT[home]??.5)+.015, pAway=(PCT[away]??.5)-.015;
+      const u=(hashStr(`${dateISO}:${home}-${away}`)%10000)/10000;
+      const homeWins = u < (pHome/(pHome+pAway));
+      const base=(hashStr(`${dateISO}:${away}-${home}`)%7);
+      const homeR=3+Math.floor(base/2)+(homeWins?1:0), awayR=3+(base%2)+(homeWins?0:1);
+      return {homeWins,homeR,awayR};
+    }
+    function rangeDates(startISO, endISO){
+      const out=[]; const d=new Date(startISO+"T00:00:00"); const end=new Date(endISO+"T00:00:00");
+      for(; d<=end; d.setDate(d.getDate()+1)){ out.push(d.toISOString().slice(0,10)); }
+      return out;
+    }
+    function simALW(startISO, endISO, enabled=true){
+      const tbl = Object.fromEntries(ALW.map(t=>[t,{W:0,L:0}]));
+      if(!enabled || !startISO || !endISO) return tbl;
+      const days = rangeDates(startISO, endISO);
+      for(const date of days){
+        // 5チーム → 2カード＋1休養。休養チームはローテーションで決める
+        const restIdx = hashStr(date) % ALW.length;
+        const restTeam = ALW[restIdx];
+        const others = ALW.filter(t=>t!==restTeam);
+        // pair: 0 vs 1, 2 vs ?（ホーム割は適当に）
+        const pairs = [ {home:others[0], away:others[1]}, {home:others[2], away:others[0] === others[1] ? restTeam : others[3]} ];
+        // 上の2組構成は日によって重複しないよう hash を混ぜて決定
+        const orderHash = hashStr(date+"-ord")%2;
+        if(orderHash===1) pairs.reverse();
+
+        for(const m of pairs){
+          if(!ALW.includes(m.home) || !ALW.includes(m.away)) continue;
+          const res = decideWin(m.home, m.away, date);
+          const win = res.homeWins ? m.home : m.away;
+          const lose = res.homeWins ? m.away : m.home;
+          tbl[win].W++; tbl[lose].L++;
         }
+      }
+      return tbl;
+    }
+    function renderALW(table){
+      const arr = Object.entries(table).map(([team,wl])=>({team, ...wl, pct:(wl.W+wl.L? wl.W/(wl.W+wl.L):0)}))
+                                      .sort((a,b)=>b.pct-a.pct || (b.W-a.W));
+      const tb = document.querySelector('#alw-table tbody');
+      tb.innerHTML = '';
+      arr.forEach((t,i)=>{
+        const gb = i===0 ? 0 : ((arr[0].W - t.W) + (t.L - arr[0].L))/2;
+        const tr = document.createElement('tr');
+        [i+1, t.team, t.W, t.L, t.pct.toFixed(3), gb.toFixed(1)].forEach((c,idx)=>{
+          const td=document.createElement('td');
+          td.className="px-3 py-2 border-b border-slate-200 "+(idx<2?"text-left":"text-center");
+          td.textContent=c;
+          tr.appendChild(td);
+        });
+        tb.appendChild(tr);
+      });
+    }
+
+    // ===== ログ（食事・運動） =====
+    function extractExercise(comment){
+      const c=(comment||'').toString();
+      // 例: 「バイク1時間」「エアロバイク 60分」「20秒×10セット」「ラン10km」などを緩く拾う
+      const h = /([0-9]+)\s*時間/.exec(c);
+      const m = /([0-9]+)\s*分/.exec(c);
+      const ssets = /([0-9]+)\s*秒\s*[×x*]\s*([0-9]+)/i.exec(c);
+      const km = /([0-9]+(?:\\.[0-9]+)?)\s*km/i.exec(c);
+      const parts=[];
+      if(h) parts.push(`${h[1]}時間`);
+      if(m) parts.push(`${m[1]}分`);
+      if(ssets) parts.push(`${ssets[1]}秒×${ssets[2]}セット`);
+      if(km) parts.push(`${km[1]}km`);
+      if(/(バイク|エアロバイク|サイクリング)/.test(c) && parts.length===0) parts.push("バイク");
+      if(/(ラン|ジョグ|ランニング)/.test(c) && parts.length===0) parts.push("ラン");
+      return parts.join(" / ");
+    }
+    function renderLogs(rows){
+      const tb = document.querySelector('#log-table tbody');
+      tb.innerHTML='';
+      const byDate = [...rows].sort((a,b)=>a.date.localeCompare(b.date));
+      for(const r of byDate){
+        const td = (text)=>{ const el=document.createElement('td'); el.className="px-3 py-2 border-b border-slate-200"; el.textContent=text??''; return el; };
+        const tr = document.createElement('tr');
+        const bat = `${r.AB||0}-${r.H||0} ${r.HR||0} ${r.RBI||0} ${r.R||0} ${r.BB||0}`;
+        const nut = `${r.kcal_total||0}/${r.carb_total||0}/${r.prot_total||0}/${r.fat_total||0}`;
+        tr.appendChild(td(r.date));
+        tr.appendChild(td(r.opponent||''));
+        tr.appendChild(td(bat));
+        tr.appendChild(td(nut));
+        tr.appendChild(td(r.breakfast||''));
+        tr.appendChild(td(r.lunch||''));
+        tr.appendChild(td(r.dinner||''));
+        tr.appendChild(td(r.snack||''));
+        tr.appendChild(td(r.drink||''));
+        tr.appendChild(td(extractExercise(r.comment)));
+        tr.appendChild(td(r.comment||''));
+        tb.appendChild(tr);
       }
     }
 
-    const order=Object.entries(teams).map(([team,v])=>({team,...v,pct:(v.W+v.L? v.W/(v.W+v.L):0)})).sort((a,b)=>b.pct-a.pct);
-    const tb=$('#standings-table tbody'); tb.innerHTML='';
-    order.forEach((t,i)=>{
-      const gb=i===0?0:((order[0].W-t.W)+(t.L-order[0].L))/2;
-      const tr=document.createElement('tr');
-      [i+1,t.team,t.W,t.L,t.pct.toFixed(3),gb.toFixed(1)].forEach(c=>{ const td=document.createElement('td'); td.className='px-3 py-2 border-b border-slate-200'; td.textContent=c; tr.appendChild(td);});
-      tb.appendChild(tr);
+    // ===== 入口 =====
+    async function main(){
+      $('#sheet-pill').textContent = `${CONFIG.SHEET_ID}/${CONFIG.SHEET_NAME}`;
+      try{
+        const csv = await fetchCSV();
+        const {rows} = parseCSV(csv);
+
+        // 通算
+        const agg = calcAgg(rows);
+        $('#agg-ab').textContent  = agg.AB;
+        $('#agg-h').textContent   = agg.H;
+        $('#agg-avg').textContent = fmt3(agg.AVG);
+        $('#agg-hr').textContent  = agg.HR;
+        $('#agg-rbi').textContent = agg.RBI;
+        $('#agg-r').textContent   = agg.R;
+        $('#agg-bb').textContent  = agg.BB;
+        $('#agg-slg').textContent = fmt3(agg.SLG);
+        $('#agg-ops').textContent = fmt3(agg.OPS);
+
+        // ランキング
+        const p = seasonProgress(rows);
+        const stars = starProjection(p);
+        const ranks = buildRanking(agg, stars);
+        renderRanking(ranks);
+
+        // AL West（データ期間に合わせる）
+        const dates = rows.map(r=>r.date).filter(Boolean).sort();
+        const startISO = dates[0] || new Date().toISOString().slice(0,10);
+        const endISO   = new Date(new Date().toLocaleString('en-US',{timeZone:CONFIG.TIMEZONE})).toISOString().slice(0,10);
+        const simOn = document.getElementById('alw-sim-toggle').checked;
+        renderALW( simALW(startISO, endISO, simOn) );
+
+        // ログ
+        renderLogs(rows);
+
+        $('#status-pill').textContent = `OK（rows:${rows.length}）`;
+      }catch(err){
+        console.error(err);
+        $('#status-pill').textContent = `エラー：${err.message}`;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', ()=>{
+      main();
+      document.getElementById('alw-sim-toggle').addEventListener('change', main);
     });
-  }
-
-  function renderTitle(todayISO){
-    const p = 0.5;
-    const tb=$('#title-table tbody'); tb.innerHTML='';
-    TITLE_PLAYERS.forEach(t=>{
-      const topVal = Array.isArray(t.top)
-        ? (t.key==='avg' ? (t.top[0]+(t.top[1]-t.top[0])*p).toFixed(3) : Math.round(t.top[0]+(t.top[1]-t.top[0])*p))
-        : t.top;
-      const your = t.key==='avg'? 'あなたAVG' : t.key==='hr'? 'あなたHR(累計)' : t.key==='rbi'? 'あなたRBI' : 'あなたR';
-      const tr=document.createElement('tr');
-      [t.title, 1, `${t.player} (${t.team})`, topVal, your].forEach(c=>{ const td=document.createElement('td'); td.className='px-3 py-2 border-b border-slate-200'; td.textContent=c; tr.appendChild(td);});
-      tb.appendChild(tr);
-    });
-  }
-
-  function loadTargets(){ const get=(k,d)=> localStorage.getItem(k) ?? d; $('#t-kcal').value=get('t-kcal',''); $('#t-carb').value=get('t-carb',''); $('#t-prot').value=get('t-prot',''); $('#t-fat').value=get('t-fat',''); }
-  function saveTargets(e){ e.preventDefault(); ['t-kcal','t-carb','t-prot','t-fat'].forEach(id=>localStorage.setItem(id,$('#'+id).value||'')); }
-  function resetTargets(){ ['t-kcal','t-carb','t-prot','t-fat'].forEach(id=>localStorage.removeItem(id)); loadTargets(); }
-
-  async function main(){
-    $('#sheet-pill').textContent = `${CONFIG.SHEET_ID}/${CONFIG.SHEET_NAME}`;
-    loadTargets();
-    try{
-      const [csv, schedule] = await Promise.all([ fetchCSV(), Promise.resolve(scheduleFromEmbed()) ]);
-      const {rows} = parseCSV(csv);            // ← 正規化済みで取得
-      const todayISO = toISO(new Date());
-
-      fillMissingScores(rows, schedule, todayISO);
-      renderSum(rows);
-      renderGameLog(rows);
-      renderLatestAndNext(rows, schedule, todayISO);
-      renderStandings(rows, schedule, todayISO, $('#sim-toggle').checked);
-      renderTitle(todayISO);
-      $('#status-pill').textContent=`OK（rows:${rows.length}）`;
-    }catch(e){ console.error(e); $('#status-pill').textContent='エラー'; }
-  }
-
-  document.addEventListener('DOMContentLoaded', ()=>{
-    main();
-    $('#sim-toggle').addEventListener('change', ()=>main());
-    $('#btn-target-save').addEventListener('click', saveTargets);
-    $('#btn-target-reset').addEventListener('click', resetTargets);
-    const embed = document.getElementById('schedule-embed').textContent; $('#schedule-json').value = embed;
-    document.getElementById('btn-apply-schedule').addEventListener('click', (e)=>{ e.preventDefault(); try{ document.getElementById('schedule-embed').textContent = $('#schedule-json').value; main(); }catch(err){ console.error('JSONエラー',err);} });
-  });
   </script>
 </body>
 </html>
