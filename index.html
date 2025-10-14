@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Diet MLB Dashboard</title>
+  <title>Diet MLB Dashboard — NL West</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -47,20 +47,20 @@
           <ol id="rank-rbi" class="space-y-2 text-sm"></ol>
         </div>
       </div>
-      <p class="text-xs text-slate-500 mt-2">※ ランキングは「あなた」＋主要スター（想定進行値）で比較表示します。</p>
+      <p class="text-xs text-slate-500 mt-2">※ ランキングは「あなた」＋主要スター（<span class="font-semibold">ナ・リーグ</span>想定進行値）で比較表示します。</p>
     </section>
 
-    <!-- ア・リーグ西地区 順位表 ------------->
+    <!-- ナ・リーグ西地区 順位表 -------------->
     <section class="mb-10">
       <div class="flex items-center justify-between mb-2">
-        <h2 class="text-xl font-semibold">ア・リーグ西地区の順位表</h2>
+        <h2 class="text-xl font-semibold">ナ・リーグ西地区の順位表</h2>
         <label class="text-sm inline-flex items-center gap-2">
-          <input id="alw-sim-toggle" type="checkbox" class="scale-110" checked />
+          <input id="nlw-sim-toggle" type="checkbox" class="scale-110" checked />
           シミュレーション有効（期間：データ開始日〜今日）
         </label>
       </div>
       <div class="overflow-x-auto bg-white border rounded-xl">
-        <table class="w-full text-sm" id="alw-table">
+        <table class="w-full text-sm" id="nlw-table">
           <thead>
             <tr class="bg-slate-100 text-slate-700">
               <th class="px-3 py-2 text-left">順位</th>
@@ -74,7 +74,7 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="text-xs text-slate-500 mt-2">※ 実試合成績は取得していないため、チーム実力値を元に日別決定論で集計（HOU/TEX/SEA/LAA/OAK）。</p>
+      <p class="text-xs text-slate-500 mt-2">※ 実試合成績は取得していないため、チーム実力値を元に日別決定論で集計（LAD/SF/SD/ARI/COL）。</p>
     </section>
 
     <!-- 食事・運動ログ ------------------------>
@@ -170,7 +170,7 @@
     }
     function fmt3(x){ return (x||0).toFixed(3); }
 
-    // ===== ランキング（あなた＋スター想定） =====
+    // ===== ランキング（あなた＋NLスター想定） =====
     // シーズン進捗p（あなたのデータ開始日〜今日の相対：最大1.0）
     function seasonProgress(rows){
       if(!rows.length) return 0;
@@ -181,13 +181,13 @@
       return Math.max(0, Math.min(1, (today - start)/span));
     }
     function starProjection(p){
-      // ざっくり想定（フルでの到達点）— 最終到達 × 進捗p
+      // NL主要バッター（便宜上のフル到達点）
       const stars = [
-        {name:"Aaron Judge", team:"NYY", HR:58, RBI:130, AVG:0.280},
-        {name:"Yordan Alvarez", team:"HOU", HR:45, RBI:125, AVG:0.295},
-        {name:"Corey Seager", team:"TEX", HR:35, RBI:105, AVG:0.300},
-        {name:"Julio Rodríguez", team:"SEA", HR:34, RBI:100, AVG:0.285},
-        {name:"Kyle Tucker", team:"HOU", HR:37, RBI:110, AVG:0.280},
+        {name:"Bryce Harper", team:"PHI", HR:44, RBI:120, AVG:0.300},
+        {name:"Matt Olson",   team:"ATL", HR:46, RBI:125, AVG:0.270},
+        {name:"Pete Alonso",  team:"NYM", HR:45, RBI:115, AVG:0.255},
+        {name:"Fernando Tatis Jr.", team:"SD", HR:38, RBI:105, AVG:0.285},
+        {name:"Luis Arraez",  team:"SD", HR:10, RBI:65,  AVG:0.330}
       ];
       return stars.map(s=>({
         name: s.name, team: s.team,
@@ -225,9 +225,9 @@
       paint(rankRBI, document.getElementById('rank-rbi'));
     }
 
-    // ===== AL West 順位（決定論シミュ） =====
-    const ALW = ["HOU","TEX","SEA","LAA","OAK"];
-    const PCT = { HOU:0.570, TEX:0.540, SEA:0.540, LAA:0.430, OAK:0.350 };
+    // ===== NL West 順位（決定論シミュ） =====
+    const NLW = ["LAD","SF","SD","ARI","COL"]; // NL West
+    const PCT = { LAD:0.610, SF:0.520, SD:0.530, ARI:0.515, COL:0.400 }; // 便宜上の実力値
     const hashStr=(s)=>{ let h=2166136261>>>0; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0 } return h; };
     function decideWin(home, away, dateISO){
       const pHome=(PCT[home]??.5)+.015, pAway=(PCT[away]??.5)-.015;
@@ -242,23 +242,18 @@
       for(; d<=end; d.setDate(d.getDate()+1)){ out.push(d.toISOString().slice(0,10)); }
       return out;
     }
-    function simALW(startISO, endISO, enabled=true){
-      const tbl = Object.fromEntries(ALW.map(t=>[t,{W:0,L:0}]));
+    function simNLW(startISO, endISO, enabled=true){
+      const tbl = Object.fromEntries(NLW.map(t=>[t,{W:0,L:0}]));
       if(!enabled || !startISO || !endISO) return tbl;
       const days = rangeDates(startISO, endISO);
       for(const date of days){
-        // 5チーム → 2カード＋1休養。休養チームはローテーションで決める
-        const restIdx = hashStr(date) % ALW.length;
-        const restTeam = ALW[restIdx];
-        const others = ALW.filter(t=>t!==restTeam);
-        // pair: 0 vs 1, 2 vs ?（ホーム割は適当に）
-        const pairs = [ {home:others[0], away:others[1]}, {home:others[2], away:others[0] === others[1] ? restTeam : others[3]} ];
-        // 上の2組構成は日によって重複しないよう hash を混ぜて決定
-        const orderHash = hashStr(date+"-ord")%2;
-        if(orderHash===1) pairs.reverse();
-
+        const restIdx = hashStr(date) % NLW.length;
+        const restTeam = NLW[restIdx];
+        const others = NLW.filter(t=>t!==restTeam);
+        const pairs = [ {home:others[0], away:others[1]}, {home:others[2], away:others[3]} ];
+        const orderHash = hashStr(date+"-ord")%2; if(orderHash===1) pairs.reverse();
         for(const m of pairs){
-          if(!ALW.includes(m.home) || !ALW.includes(m.away)) continue;
+          if(!NLW.includes(m.home) || !NLW.includes(m.away)) continue;
           const res = decideWin(m.home, m.away, date);
           const win = res.homeWins ? m.home : m.away;
           const lose = res.homeWins ? m.away : m.home;
@@ -267,10 +262,10 @@
       }
       return tbl;
     }
-    function renderALW(table){
+    function renderNLW(table){
       const arr = Object.entries(table).map(([team,wl])=>({team, ...wl, pct:(wl.W+wl.L? wl.W/(wl.W+wl.L):0)}))
                                       .sort((a,b)=>b.pct-a.pct || (b.W-a.W));
-      const tb = document.querySelector('#alw-table tbody');
+      const tb = document.querySelector('#nlw-table tbody');
       tb.innerHTML = '';
       arr.forEach((t,i)=>{
         const gb = i===0 ? 0 : ((arr[0].W - t.W) + (t.L - arr[0].L))/2;
@@ -288,11 +283,10 @@
     // ===== ログ（食事・運動） =====
     function extractExercise(comment){
       const c=(comment||'').toString();
-      // 例: 「バイク1時間」「エアロバイク 60分」「20秒×10セット」「ラン10km」などを緩く拾う
       const h = /([0-9]+)\s*時間/.exec(c);
       const m = /([0-9]+)\s*分/.exec(c);
       const ssets = /([0-9]+)\s*秒\s*[×x*]\s*([0-9]+)/i.exec(c);
-      const km = /([0-9]+(?:\\.[0-9]+)?)\s*km/i.exec(c);
+      const km = /([0-9]+(?:\.[0-9]+)?)\s*km/i.exec(c);
       const parts=[];
       if(h) parts.push(`${h[1]}時間`);
       if(m) parts.push(`${m[1]}分`);
@@ -345,18 +339,18 @@
         $('#agg-slg').textContent = fmt3(agg.SLG);
         $('#agg-ops').textContent = fmt3(agg.OPS);
 
-        // ランキング
+        // ランキング（NLスター）
         const p = seasonProgress(rows);
         const stars = starProjection(p);
         const ranks = buildRanking(agg, stars);
         renderRanking(ranks);
 
-        // AL West（データ期間に合わせる）
+        // NL West（データ期間に合わせる）
         const dates = rows.map(r=>r.date).filter(Boolean).sort();
         const startISO = dates[0] || new Date().toISOString().slice(0,10);
         const endISO   = new Date(new Date().toLocaleString('en-US',{timeZone:CONFIG.TIMEZONE})).toISOString().slice(0,10);
-        const simOn = document.getElementById('alw-sim-toggle').checked;
-        renderALW( simALW(startISO, endISO, simOn) );
+        const simOn = document.getElementById('nlw-sim-toggle').checked;
+        renderNLW( simNLW(startISO, endISO, simOn) );
 
         // ログ
         renderLogs(rows);
@@ -370,7 +364,7 @@
 
     document.addEventListener('DOMContentLoaded', ()=>{
       main();
-      document.getElementById('alw-sim-toggle').addEventListener('change', main);
+      document.getElementById('nlw-sim-toggle').addEventListener('change', main);
     });
   </script>
 </body>
