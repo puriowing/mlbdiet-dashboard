@@ -16,7 +16,7 @@
     <!-- 通算成績 ------------------------------->
     <section class="mb-8">
       <h2 class="text-xl font-semibold mb-3">これまでの通算成績</h2>
-      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-3 text-center">
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-10 gap-3 text-center">
         <div><div class="text-xs text-slate-500">AB</div><div id="agg-ab" class="text-2xl font-semibold">-</div></div>
         <div><div class="text-xs text-slate-500">H</div><div id="agg-h" class="text-2xl font-semibold">-</div></div>
         <div><div class="text-xs text-slate-500">AVG</div><div id="agg-avg" class="text-2xl font-semibold">.000</div></div>
@@ -24,6 +24,7 @@
         <div><div class="text-xs text-slate-500">RBI</div><div id="agg-rbi" class="text-2xl font-semibold">-</div></div>
         <div><div class="text-xs text-slate-500">R</div><div id="agg-r" class="text-2xl font-semibold">-</div></div>
         <div><div class="text-xs text-slate-500">BB</div><div id="agg-bb" class="text-2xl font-semibold">-</div></div>
+        <div><div class="text-xs text-slate-500">OBP</div><div id="agg-obp" class="text-2xl font-semibold">.000</div></div>
         <div><div class="text-xs text-slate-500">SLG</div><div id="agg-slg" class="text-2xl font-semibold">.000</div></div>
         <div><div class="text-xs text-slate-500">OPS</div><div id="agg-ops" class="text-2xl font-semibold">.000</div></div>
       </div>
@@ -74,7 +75,7 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="text-xs text-slate-500 mt-2">※ 実試合成績は取得していないため、チーム実力値を元に日別決定論で集計（LAD/SF/SD/ARI/COL）。</p>
+      <p class="text-xs text-slate-500 mt-2">※ LADは<b>gamesシートの結果</b>（あなたのログ）をそのまま反映。SF/SD/ARI/COLはチーム実力値による日別決定論シミュレーション。</p>
     </section>
 
     <!-- 食事・運動ログ ------------------------>
@@ -336,6 +337,7 @@
         $('#agg-rbi').textContent = agg.RBI;
         $('#agg-r').textContent   = agg.R;
         $('#agg-bb').textContent  = agg.BB;
+        $('#agg-obp').textContent = fmt3(agg.OBP);
         $('#agg-slg').textContent = fmt3(agg.SLG);
         $('#agg-ops').textContent = fmt3(agg.OPS);
 
@@ -350,7 +352,13 @@
         const startISO = dates[0] || new Date().toISOString().slice(0,10);
         const endISO   = new Date(new Date().toLocaleString('en-US',{timeZone:CONFIG.TIMEZONE})).toISOString().slice(0,10);
         const simOn = document.getElementById('nlw-sim-toggle').checked;
-        renderNLW( simNLW(startISO, endISO, simOn) );
+        (function(){
+          const table = simNLW(startISO, endISO, simOn);
+          const youW = rows.filter(r => String(r.result||'').toUpperCase()==='W').length;
+          const youL = rows.filter(r => String(r.result||'').toUpperCase()==='L').length;
+          table['LAD'] = { W: youW, L: youL };
+          renderNLW(table);
+        })();
 
         // ログ
         renderLogs(rows);
