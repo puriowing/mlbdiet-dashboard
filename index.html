@@ -75,7 +75,7 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="text-xs text-slate-500 mt-2">※ LADは<b>gamesシートの結果</b>（あなたのログ）をそのまま反映。SF/SD/ARI/COLはチーム実力値による日別決定論シミュレーション。</p>
+      <p class="text-xs text-slate-500 mt-2">※ LADは<b>gamesシートの結果</b>（あなたのログ）をそのまま反映。SF/SD/ARI/COLはチーム実力値による日別決定論シミュレーション。期間は5日の倍数に切り下げて集計するため、<b>全チームの総試合数が一致</b>します。</p>
     </section>
 
     <!-- 食事・運動ログ ------------------------>
@@ -236,6 +236,30 @@
     }
     function simNLW(startISO, endISO, enabled=true){
       const tbl = Object.fromEntries(NLW.map(t=>[t,{W:0,L:0}]));
+      if(!enabled || !startISO || !endISO) return tbl;
+      const daysAll = rangeDates(startISO, endISO);
+      // 5の倍数日に切り下げて、各チームの合計試合数を一致させる（1日=2試合=4チーム稼働、常に1チーム休み）
+      const usable = daysAll.length - (daysAll.length % 5);
+      const days = daysAll.slice(0, usable);
+      const pairPatterns = [
+        (o)=>[{home:o[0],away:o[1]},{home:o[2],away:o[3]}],
+        (o)=>[{home:o[0],away:o[2]},{home:o[1],away:o[3]}],
+        (o)=>[{home:o[0],away:o[3]},{home:o[1],away:o[2]}],
+      ];
+      for(let i=0;i<days.length;i++){
+        const date = days[i];
+        const restTeam = NLW[i % NLW.length]; // 5日サイクルで休養を均等ローテ
+        const others = NLW.filter(t=>t!==restTeam);
+        const pairs = pairPatterns[i % pairPatterns.length](others);
+        for(const m of pairs){
+          const res = decideWin(m.home, m.away, date);
+          const win = res.homeWins ? m.home : m.away;
+          const lose = res.homeWins ? m.away : m.home;
+          tbl[win].W++; tbl[lose].L++;
+        }
+      }
+      return tbl;
+    }]));
       if(!enabled || !startISO || !endISO) return tbl;
       const days = rangeDates(startISO, endISO);
       for(const date of days){
