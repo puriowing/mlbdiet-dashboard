@@ -52,15 +52,16 @@
       <p class="text-xs text-slate-500 mt-2">※ ランキングは「あなた」＋主要スター（<span class="font-semibold">ナ・リーグ</span>想定進行値）で比較表示します。</p>
     </section>
 
-    <!-- OPS & Nutrition Charts ---------------->
+    <!-- OPS（累計ベース）＆ 栄養グラフ --------->
     <section class="mb-10">
-      <h2 class="text-xl font-semibold mb-3">OPSの推移</h2>
+      <h2 class="text-xl font-semibold mb-3">OPSの推移（各日までの累計成績ベース）</h2>
       <div class="bg-white border rounded-xl p-4">
         <div class="h-56"><canvas id="ops-chart" height="120"></canvas></div>
       </div>
     </section>
+
     <section class="mb-10">
-      <h2 class="text-xl font-semibold mb-3">日別摂取カロリー＆糖質</h2>
+      <h2 class="text-xl font-semibold mb-3">日別 摂取カロリー＆糖質</h2>
       <div class="bg-white border rounded-xl p-4">
         <div class="h-56"><canvas id="nutr-chart" height="120"></canvas></div>
       </div>
@@ -193,10 +194,11 @@
       const dates = rows.map(r=>r.date).filter(Boolean).sort();
       const start = new Date(dates[0]+"T00:00:00");
       const today = new Date(new Date().toLocaleString('en-US',{timeZone:CONFIG.TIMEZONE}));
-      const span = 180*24*3600*1000;
+      const span = 180*24*3600*1000; // 便宜上180日をシーズン長とする
       return Math.max(0, Math.min(1, (today - start)/span));
     }
     function starProjection(p){
+      // NL主要バッター（便宜上のフル到達点）
       const stars = [
         {name:"Bryce Harper", team:"PHI", HR:44, RBI:120, AVG:0.300},
         {name:"Matt Olson",   team:"ATL", HR:46, RBI:125, AVG:0.270},
@@ -204,7 +206,12 @@
         {name:"Fernando Tatis Jr.", team:"SD", HR:38, RBI:105, AVG:0.285},
         {name:"Luis Arraez",  team:"SD", HR:10, RBI:65,  AVG:0.330}
       ];
-      return stars.map(s=>({ name:s.name, team:s.team, HR:Math.round(s.HR*p), RBI:Math.round(s.RBI*p), AVG:s.AVG }));
+      return stars.map(s=>({
+        name: s.name, team: s.team,
+        HR: Math.round(s.HR*p),
+        RBI: Math.round(s.RBI*p),
+        AVG: s.AVG
+      }));
     }
     function buildRanking(youAgg, stars){
       const you = {name:"あなた", team:"", HR:youAgg.HR, RBI:youAgg.RBI, AVG:youAgg.AVG};
@@ -234,31 +241,69 @@
       paint(rankRBI, document.getElementById('rank-rbi'));
     }
 
-    // ===== OPS / Nutrition Trends =====
-    let opsChart, nutrChart;
-    function renderOPSTrend(rows){
+    // ===== OPS累計推移 =====
+    let opsChart;
+    function renderOPSCumulative(rows){
       const byDate = [...rows].filter(r=>r.date).sort((a,b)=>a.date.localeCompare(b.date));
-      const labels = byDate.map(r=>r.date);
-      const obp = byDate.map(r=>{ const AB=+r.AB||0, H=+r.H||0, BB=+r.BB||0; const d=AB+BB; return d? (H+BB)/d:0; });
-      const slg = byDate.map(r=>{ const AB=+r.AB||0, TB=+r.TB||0; return AB? (TB/AB):0; });
-      const ops = obp.map((v,i)=> v + slg[i]);
+      const labels = [];
+      const data = [];
+      let ab=0, h=0, bb=0, tb=0;
+      for(const r of byDate){
+        ab += (+r.AB||0);
+        h  += (+r.H ||0);
+        bb += (+r.BB||0);
+        tb += (+r.TB||0);
+        const obp = (ab+bb) ? (h+bb)/(ab+bb) : 0;
+        const slg = ab ? (tb/ab) : 0;
+        labels.push(r.date);
+        data.push(+((obp+slg).toFixed(3)));
+      }
       const ctx = document.getElementById('ops-chart');
-      if(!ctx) return; if(opsChart) opsChart.destroy();
-      opsChart = new Chart(ctx,{ type:'line', data:{ labels, datasets:[{ label:'OPS', data:ops, tension:0.25 }] }, options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, suggestedMax:1.2 }}, interaction:{ mode:'index', intersect:false } }});
+      if(!ctx) return;
+      if(opsChart) opsChart.destroy();
+      opsChart = new Chart(ctx,{
+        type:'line',
+        data:{ labels, datasets:[{ label:'OPS（累計ベース）', data, tension:0.25 }] },
+        options:{ responsive:true, maintainAspectRatio:false,
+          scales:{ y:{ beginAtZero:true, suggestedMax:1.2 } },
+          interaction:{ mode:'index', intersect:false },
+          plugins:{ tooltip:{ callbacks:{ label:(c)=>`OPS: ${(+c.parsed.y).toFixed(3)}` } } }
+        }
+      });
     }
+
+    // ===== 栄養トレンド（kcal/糖質） =====
+    let nutrChart;
     function renderNutritionTrend(rows){
       const byDate = [...rows].filter(r=>r.date).sort((a,b)=>a.date.localeCompare(b.date));
       const labels = byDate.map(r=>r.date);
       const kcal = byDate.map(r=> +r.kcal_total || 0);
       const carb = byDate.map(r=> +r.carb_total || 0);
       const ctx = document.getElementById('nutr-chart');
-      if(!ctx) return; if(nutrChart) nutrChart.destroy();
-      nutrChart = new Chart(ctx,{ data:{ labels, datasets:[ { type:'bar', label:'Carb (g)', data:carb, yAxisID:'y' }, { type:'line', label:'kcal', data:kcal, yAxisID:'y1', tension:0.25 } ] }, options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, title:{display:true, text:'g'} }, y1:{ beginAtZero:true, position:'right', grid:{ drawOnChartArea:false }, title:{display:true, text:'kcal'} } }, interaction:{ mode:'index', intersect:false } }});
+      if(!ctx) return;
+      if(nutrChart) nutrChart.destroy();
+      nutrChart = new Chart(ctx,{
+        data:{
+          labels,
+          datasets:[
+            { type:'bar',  label:'Carb (g)', data:carb, yAxisID:'y'  },
+            { type:'line', label:'kcal',     data:kcal, yAxisID:'y1', tension:0.25 }
+          ]
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          scales:{
+            y:  { beginAtZero:true, title:{display:true, text:'g'} },
+            y1: { beginAtZero:true, position:'right', grid:{ drawOnChartArea:false }, title:{display:true, text:'kcal'} }
+          },
+          interaction:{ mode:'index', intersect:false }
+        }
+      });
     }
 
     // ===== NL West 順位（同一試合数サイクル） =====
-    const NLW = ["LAD","SF","SD","ARI","COL"]; // NL West
-    const PCT = { LAD:0.610, SF:0.520, SD:0.530, ARI:0.515, COL:0.400 }; // 便宜上の実力値
+    const NLW = ["LAD","SF","SD","ARI","COL"];
+    const PCT = { LAD:0.610, SF:0.520, SD:0.530, ARI:0.515, COL:0.400 };
     const hashStr=(s)=>{ let h=2166136261>>>0; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0 } return h; };
     function decideWin(home, away, seed){
       const pHome=(PCT[home]??.5)+.015, pAway=(PCT[away]??.5)-.015;
@@ -275,7 +320,7 @@
       ];
       let dayIdx = 0;
       for(let c=0;c<cycles;c++){
-        for(let d=0; d<5; d++){
+        for(let d=0; d<5; d++){ // 5日=各チーム4試合（1休養）
           const restTeam = NLW[(dayIdx) % NLW.length];
           const others = NLW.filter(t=>t!==restTeam);
           const pairs = pairPatterns[dayIdx % pairPatterns.length](others);
@@ -375,8 +420,8 @@
         const ranks = buildRanking(agg, stars);
         renderRanking(ranks);
 
-        // グラフ
-        renderOPSTrend(rows);
+        // 累計OPS・栄養グラフ
+        renderOPSCumulative(rows);
         renderNutritionTrend(rows);
 
         // NL West（LADに合わせて同数試合＝4の倍数）
