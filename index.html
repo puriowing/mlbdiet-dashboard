@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Diet MLB Dashboard — NL West</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800">
   <div class="max-w-7xl mx-auto px-4 py-6">
@@ -51,13 +52,27 @@
       <p class="text-xs text-slate-500 mt-2">※ ランキングは「あなた」＋主要スター（<span class="font-semibold">ナ・リーグ</span>想定進行値）で比較表示します。</p>
     </section>
 
+    <!-- OPS & Nutrition Charts ---------------->
+    <section class="mb-10">
+      <h2 class="text-xl font-semibold mb-3">OPSの推移</h2>
+      <div class="bg-white border rounded-xl p-4">
+        <div class="h-56"><canvas id="ops-chart" height="120"></canvas></div>
+      </div>
+    </section>
+    <section class="mb-10">
+      <h2 class="text-xl font-semibold mb-3">日別摂取カロリー＆糖質</h2>
+      <div class="bg-white border rounded-xl p-4">
+        <div class="h-56"><canvas id="nutr-chart" height="120"></canvas></div>
+      </div>
+    </section>
+
     <!-- ナ・リーグ西地区 順位表 -------------->
     <section class="mb-10">
       <div class="flex items-center justify-between mb-2">
         <h2 class="text-xl font-semibold">ナ・リーグ西地区の順位表</h2>
         <label class="text-sm inline-flex items-center gap-2">
           <input id="nlw-sim-toggle" type="checkbox" class="scale-110" checked />
-          シミュレーション有効（期間：データ開始日〜今日）
+          シミュレーション有効（LADの試合数に合わせて4の倍数に均等化）
         </label>
       </div>
       <div class="overflow-x-auto bg-white border rounded-xl">
@@ -75,7 +90,7 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="text-xs text-slate-500 mt-2">※ LADは<b>gamesシートの結果</b>（あなたのログ）をそのまま反映。SF/SD/ARI/COLはチーム実力値による日別決定論シミュレーション。期間は5日の倍数に切り下げて集計するため、<b>全チームの総試合数が一致</b>します。</p>
+      <p class="text-xs text-slate-500 mt-2">※ LADは<b>gamesシートの結果</b>から反映。他4球団は同一試合数（4の倍数）となるようサイクル制でシミュレーション。</p>
     </section>
 
     <!-- 食事・運動ログ ------------------------>
@@ -101,7 +116,7 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="text-xs text-slate-500 mt-2">※ 「運動」は <code>exercise</code> 列を優先し、無い場合はコメントから簡易抽出（例：<code>バイク1時間</code>、<code>20秒×10</code>など）。</p>
+      <p class="text-xs text-slate-500 mt-2">※ 「運動」は <code>exercise</code> 列を優先し、無い場合はコメントから簡易抽出。</p>
     </section>
 
     <!-- フッター状態 ------------------------->
@@ -219,42 +234,59 @@
       paint(rankRBI, document.getElementById('rank-rbi'));
     }
 
-    // ===== NL West 順位（決定論シミュ：全チーム同数試合） =====
-    const NLW = ["LAD","SF","SD","ARI","COL"];
-    const PCT = { LAD:0.610, SF:0.520, SD:0.530, ARI:0.515, COL:0.400 };
+    // ===== OPS / Nutrition Trends =====
+    let opsChart, nutrChart;
+    function renderOPSTrend(rows){
+      const byDate = [...rows].filter(r=>r.date).sort((a,b)=>a.date.localeCompare(b.date));
+      const labels = byDate.map(r=>r.date);
+      const obp = byDate.map(r=>{ const AB=+r.AB||0, H=+r.H||0, BB=+r.BB||0; const d=AB+BB; return d? (H+BB)/d:0; });
+      const slg = byDate.map(r=>{ const AB=+r.AB||0, TB=+r.TB||0; return AB? (TB/AB):0; });
+      const ops = obp.map((v,i)=> v + slg[i]);
+      const ctx = document.getElementById('ops-chart');
+      if(!ctx) return; if(opsChart) opsChart.destroy();
+      opsChart = new Chart(ctx,{ type:'line', data:{ labels, datasets:[{ label:'OPS', data:ops, tension:0.25 }] }, options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, suggestedMax:1.2 }}, interaction:{ mode:'index', intersect:false } }});
+    }
+    function renderNutritionTrend(rows){
+      const byDate = [...rows].filter(r=>r.date).sort((a,b)=>a.date.localeCompare(b.date));
+      const labels = byDate.map(r=>r.date);
+      const kcal = byDate.map(r=> +r.kcal_total || 0);
+      const carb = byDate.map(r=> +r.carb_total || 0);
+      const ctx = document.getElementById('nutr-chart');
+      if(!ctx) return; if(nutrChart) nutrChart.destroy();
+      nutrChart = new Chart(ctx,{ data:{ labels, datasets:[ { type:'bar', label:'Carb (g)', data:carb, yAxisID:'y' }, { type:'line', label:'kcal', data:kcal, yAxisID:'y1', tension:0.25 } ] }, options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, title:{display:true, text:'g'} }, y1:{ beginAtZero:true, position:'right', grid:{ drawOnChartArea:false }, title:{display:true, text:'kcal'} } }, interaction:{ mode:'index', intersect:false } }});
+    }
+
+    // ===== NL West 順位（同一試合数サイクル） =====
+    const NLW = ["LAD","SF","SD","ARI","COL"]; // NL West
+    const PCT = { LAD:0.610, SF:0.520, SD:0.530, ARI:0.515, COL:0.400 }; // 便宜上の実力値
     const hashStr=(s)=>{ let h=2166136261>>>0; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0 } return h; };
-    function decideWin(home, away, dateISO){
+    function decideWin(home, away, seed){
       const pHome=(PCT[home]??.5)+.015, pAway=(PCT[away]??.5)-.015;
-      const u=(hashStr(`${dateISO}:${home}-${away}`)%10000)/10000;
-      const homeWins = u < (pHome/(pHome+pAway));
-      return {homeWins};
+      const u=(hashStr(`${seed}:${home}-${away}`)%10000)/10000;
+      return {homeWins: u < (pHome/(pHome+pAway))};
     }
-    function rangeDates(startISO, endISO){
-      const out=[]; const d=new Date(startISO+"T00:00:00"); const end=new Date(endISO+"T00:00:00");
-      for(; d<=end; d.setDate(d.getDate()+1)){ out.push(d.toISOString().slice(0,10)); }
-      return out;
-    }
-    function simNLW(startISO, endISO, enabled=true){
+    function simNLWByCycles(cycles){
       const tbl = Object.fromEntries(NLW.map(t=>[t,{W:0,L:0}]));
-      if(!enabled || !startISO || !endISO) return tbl;
-      const daysAll = rangeDates(startISO, endISO);
-      const usable = daysAll.length - (daysAll.length % 5);
-      const days = daysAll.slice(0, Math.max(0, usable));
+      if(cycles<=0) return tbl;
       const pairPatterns = [
         (o)=>[{home:o[0],away:o[1]},{home:o[2],away:o[3]}],
         (o)=>[{home:o[0],away:o[2]},{home:o[1],away:o[3]}],
         (o)=>[{home:o[0],away:o[3]},{home:o[1],away:o[2]}],
       ];
-      for(let i=0;i<days.length;i++){
-        const date = days[i];
-        const restTeam = NLW[i % NLW.length];
-        const others = NLW.filter(t=>t!==restTeam);
-        const pairs = pairPatterns[i % pairPatterns.length](others);
-        for(const m of pairs){
-          const {homeWins} = decideWin(m.home, m.away, date);
-          const win = homeWins ? m.home : m.away;
-          const lose = homeWins ? m.away : m.home;
-          tbl[win].W++; tbl[lose].L++;
+      let dayIdx = 0;
+      for(let c=0;c<cycles;c++){
+        for(let d=0; d<5; d++){
+          const restTeam = NLW[(dayIdx) % NLW.length];
+          const others = NLW.filter(t=>t!==restTeam);
+          const pairs = pairPatterns[dayIdx % pairPatterns.length](others);
+          const seed = `C${c}-D${d}`;
+          for(const m of pairs){
+            const {homeWins} = decideWin(m.home, m.away, seed);
+            const win = homeWins ? m.home : m.away;
+            const lose = homeWins ? m.away : m.home;
+            tbl[win].W++; tbl[lose].L++;
+          }
+          dayIdx++;
         }
       }
       return tbl;
@@ -343,15 +375,19 @@
         const ranks = buildRanking(agg, stars);
         renderRanking(ranks);
 
-        // NL West（データ期間に合わせて、全チーム同数試合に）
-        const dates = rows.map(r=>r.date).filter(Boolean).sort();
-        const startISO = dates[0] || new Date().toISOString().slice(0,10);
-        const endISO   = new Date(new Date().toLocaleString('en-US',{timeZone:CONFIG.TIMEZONE})).toISOString().slice(0,10);
-        const simOn = document.getElementById('nlw-sim-toggle').checked;
-        const table = simNLW(startISO, endISO, simOn);
-        // LADはログから上書き（W/L直接集計）
-        const youW = rows.filter(r => String(r.result||'').toUpperCase()==='W').length;
-        const youL = rows.filter(r => String(r.result||'').toUpperCase()==='L').length;
+        // グラフ
+        renderOPSTrend(rows);
+        renderNutritionTrend(rows);
+
+        // NL West（LADに合わせて同数試合＝4の倍数）
+        const ladRows = rows.filter(r=>r.result).sort((a,b)=>a.date.localeCompare(b.date));
+        const totalYou = ladRows.length; // LADのログ試合数
+        const equalGames = Math.floor(totalYou/4)*4; // 4の倍数へ
+        const cycles = equalGames/4;
+        const slice = ladRows.slice(0, equalGames);
+        const youW = slice.filter(r => String(r.result||'').toUpperCase()==='W').length;
+        const youL = slice.filter(r => String(r.result||'').toUpperCase()==='L').length;
+        const table = simNLWByCycles(cycles);
         table['LAD'] = { W: youW, L: youL };
         renderNLW(table);
 
